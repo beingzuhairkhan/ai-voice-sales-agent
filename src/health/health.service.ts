@@ -5,27 +5,36 @@ import { Model } from 'mongoose';
 import { Redis } from 'ioredis';
 import { HealthCheck } from './health-check.schema';
 
+type ServiceStatus = {
+  status: 'up' | 'down';
+  latencyMs?: number;
+};
+
+type ProviderStatus = {
+  vapi: boolean;
+  sarvam: boolean;
+  openai: boolean;
+  whatsapp: boolean;
+  googleCalendar: boolean;
+};
+
 @Injectable()
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
 
   constructor(
-    private config: ConfigService,
-    @InjectModel(HealthCheck.name) private healthModel: Model<HealthCheck>,
+    private readonly config: ConfigService,
+    @InjectModel(HealthCheck.name)
+    private readonly healthModel: Model<HealthCheck>,
+    private readonly redis: Redis,
   ) {}
 
   async checkHealth(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     services: {
-      mongodb: { status: string; latencyMs?: number };
-      redis: { status: string; latencyMs?: number };
-      providers: {
-        vapi: boolean;
-        sarvam: boolean;
-        openai: boolean;
-        whatsapp: boolean;
-        googleCalendar: boolean;
-      };
+      mongodb: ServiceStatus;
+      redis: ServiceStatus;
+      providers: ProviderStatus;
     };
     timestamp: string;
   }> {
@@ -34,68 +43,119 @@ export class HealthService {
       this.checkRedis(),
     ]);
 
-    const providerConfig = this.checkProviderConfig();
+    const providers = this.checkProviderConfig();
 
-    const allHealthy =
+    const databaseHealthy =
       mongoHealth.status === 'up' &&
       redisHealth.status === 'up';
-    const status: 'healthy' | 'degraded' | 'unhealthy' = allHealthy ? 'healthy' : 'degraded';
+
+    const status: 'healthy' | 'degraded' | 'unhealthy' =
+      databaseHealthy ? 'healthy' : 'degraded';
 
     return {
       status,
       services: {
         mongodb: mongoHealth,
         redis: redisHealth,
-        providers: providerConfig,
+        providers,
       },
       timestamp: new Date().toISOString(),
     };
   }
 
-  private async checkMongo(): Promise<{ status: string; latencyMs?: number }> {
+  private async checkMongo(): Promise<ServiceStatus> {
+    const start = Date.now();
+
     try {
-      const start = Date.now();
-      // Use the injected model's collection to ping
-      const res = await (this.healthModel.db as any).admin().ping();
-      const latency = Date.now() - start;
-      return { status: res.ok === 1 ? 'up' : 'down', latencyMs: latency };
+      const connection = this.healthModel.db;
+
+      if (connection.readyState !== 1) {
+        this.logger.warn(
+          `MongoDB is not connected. Mongoose readyState=${connection.readyState}`,
+        );
+
+        return {
+          status: 'down',
+        };
+      }
+
+      if (!connection.db) {
+        this.logger.warn('MongoDB database instance is unavailable');
+
+        return {
+          status: 'down',
+        };
+      }
+
+      await connection.db.command({ ping: 1 });
+
+      return {
+        status: 'up',
+        latencyMs: Date.now() - start,
+      };
     } catch (err) {
-      this.logger.warn({ err: (err as Error).message }, 'MongoDB health check failed');
-      return { status: 'down' };
+      const message =
+        err instanceof Error ? err.message : String(err);
+
+      this.logger.error(
+        `MongoDB health check failed: ${message}`,
+      );
+
+      return {
+        status: 'down',
+      };
     }
   }
 
-  private async checkRedis(): Promise<{ status: string; latencyMs?: number }> {
+  private async checkRedis(): Promise<ServiceStatus> {
+    const start = Date.now();
+
     try {
-      const redisUrl = this.config.get<string>('REDIS_URL', 'redis://localhost:6379');
-      const redis = new Redis(redisUrl, { maxRetriesPerRequest: 1, retryStrategy: () => null });
-      const start = Date.now();
-      const pong = await redis.ping();
-      const latency = Date.now() - start;
-      redis.disconnect();
-      return { status: pong === 'PONG' ? 'up' : 'down', latencyMs: latency };
+      const pong = await this.redis.ping();
+
+      if (pong !== 'PONG') {
+        this.logger.warn(
+          `Redis returned unexpected response: ${pong}`,
+        );
+
+        return {
+          status: 'down',
+        };
+      }
+
+      return {
+        status: 'up',
+        latencyMs: Date.now() - start,
+      };
     } catch (err) {
-      this.logger.warn({ err: (err as Error).message }, 'Redis health check failed');
-      return { status: 'down' };
+      const message =
+        err instanceof Error ? err.message : String(err);
+
+      this.logger.error(
+        `Redis health check failed: ${message}`,
+      );
+
+      return {
+        status: 'down',
+      };
     }
   }
 
-  private checkProviderConfig(): {
-    vapi: boolean;
-    sarvam: boolean;
-    openai: boolean;
-    whatsapp: boolean;
-    googleCalendar: boolean;
-  } {
+  private checkProviderConfig(): ProviderStatus {
     return {
-      vapi: Boolean(this.config.get<string>('VAPI_API_KEY')),
-      sarvam: Boolean(this.config.get<string>('SARVAM_API_KEY')),
-      openai: Boolean(this.config.get<string>('OPENAI_API_KEY')),
-      whatsapp: Boolean(this.config.get<string>('WHATSAPP_ACCESS_TOKEN')),
-      googleCalendar: Boolean(
-        this.config.get<string>('GOOGLE_CLIENT_ID') &&
-        this.config.get<string>('GOOGLE_REFRESH_TOKEN'),
-      ),
+      vapi: this.hasConfig('VAPI_API_KEY'),
+      sarvam: this.hasConfig('SARVAM_API_KEY'),
+      openai: this.hasConfig('OPENAI_API_KEY'),
+      whatsapp: this.hasConfig('WHATSAPP_ACCESS_TOKEN'),
+      googleCalendar:
+        this.hasConfig('GOOGLE_CLIENT_ID') &&
+        this.hasConfig('GOOGLE_REFRESH_TOKEN'),
     };
+  }
+
+  private hasConfig(key: string): boolean {
+    const value = this.config.get<string>(key);
+
+    return Boolean(value && value.trim().length > 0);
   }
 }

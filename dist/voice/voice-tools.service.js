@@ -108,11 +108,11 @@ let VoiceToolsService = VoiceToolsService_1 = class VoiceToolsService {
             console.log('Validating active call...');
             const call = await this.validateActiveCall(dto.callId);
             console.log('ACTIVE CALL:', call);
-            if (!call.leadId) {
-                throw new common_1.BadRequestException(`No leadId associated with call ${call._id}`);
+            if (!call) {
+                throw new common_1.BadRequestException(`No call found for Vapi call ID: ${dto.callId}`);
             }
             console.log('Finding lead for callId:', dto.callId);
-            const lead = await this.leadsService.getLeadById(call.leadId.toString());
+            const lead = await this.leadsService.getLeadByCallId(call._id);
             console.log('FOUND LEAD:', lead);
             if (!lead) {
                 console.log('❌ NO LEAD FOUND for callId:', call._id);
