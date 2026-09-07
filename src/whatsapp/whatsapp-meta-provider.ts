@@ -29,7 +29,13 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
           to: this.normalizeNumber(to),
-          type: 'text',
+          type: 'template',
+          template: {
+            name: 'hello_world',
+            language: {
+              code: 'en_US'
+            }
+          },
           text: { body, preview_url: false },
         }),
       });
