@@ -19,6 +19,14 @@ let WhatsAppController = class WhatsAppController {
     constructor(whatsappService) {
         this.whatsappService = whatsappService;
     }
+    verifyWebhook(mode, token, challenge) {
+        const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+        if (mode === 'subscribe' &&
+            token === verifyToken) {
+            return challenge;
+        }
+        throw new common_1.UnauthorizedException();
+    }
     async whatsappWebhook(body) {
         if (body?.object !==
             'whatsapp_business_account') {
@@ -36,6 +44,15 @@ let WhatsAppController = class WhatsAppController {
     }
 };
 exports.WhatsAppController = WhatsAppController;
+__decorate([
+    (0, common_1.Get)('webhooks/whatsapp'),
+    __param(0, (0, common_1.Query)('hub.mode')),
+    __param(1, (0, common_1.Query)('hub.verify_token')),
+    __param(2, (0, common_1.Query)('hub.challenge')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], WhatsAppController.prototype, "verifyWebhook", null);
 __decorate([
     (0, common_1.Post)('webhooks/whatsapp'),
     (0, common_1.HttpCode)(200),

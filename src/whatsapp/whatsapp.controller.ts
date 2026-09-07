@@ -1,8 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
+  Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -11,6 +14,26 @@ export class WhatsAppController {
   constructor(
     private readonly whatsappService: WhatsAppService,
   ) {}
+
+  @Get('webhooks/whatsapp')
+verifyWebhook(
+  @Query('hub.mode') mode: string,
+  @Query('hub.verify_token') token: string,
+  @Query('hub.challenge') challenge: string,
+) {
+  const verifyToken =
+    process.env.WHATSAPP_VERIFY_TOKEN;
+
+  if (
+    mode === 'subscribe' &&
+    token === verifyToken
+  ) {
+    return challenge;
+  }
+
+  throw new UnauthorizedException();
+}
+
 
   @Post('webhooks/whatsapp')
   @HttpCode(200)
