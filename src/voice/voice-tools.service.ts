@@ -95,14 +95,17 @@ export class VoiceToolsService {
       console.log('Validating active call...');
       const call = await this.validateActiveCall(dto.callId);
       console.log('ACTIVE CALL:', call);
-      
-if (!call) {
+
+      if (!call.leadId) {
         throw new BadRequestException(
-          `No call found for Vapi call ID: ${dto.callId}`,
+          `No leadId associated with call ${call._id}`,
         );
       }
       console.log('Finding lead for callId:', dto.callId);
-      const lead = await this.leadsService.getLeadByCallId(call._id);
+      const lead = await this.leadsService.getLeadById(
+        call.leadId.toString(),
+      );
+
       console.log('FOUND LEAD:', lead);
 
       if (!lead) {
