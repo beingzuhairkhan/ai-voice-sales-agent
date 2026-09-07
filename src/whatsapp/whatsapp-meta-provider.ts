@@ -33,11 +33,10 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
             headers: this.headers(),
             body: JSON.stringify({
               messaging_product: 'whatsapp',
-              recipient_type: 'individual',
               to: this.normalizeNumber(to),
               type: 'template',
               template: {
-                name: 'jaspers_market_order_confirmation_v1',
+                name: 'jaspers_market_plain_text_v1',
                 language: {
                   code: 'en_US',
                 },
@@ -65,6 +64,7 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
       },
     );
   }
+
 
   async sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult> {
     return this.retryUtil.withRetry(async () => {
