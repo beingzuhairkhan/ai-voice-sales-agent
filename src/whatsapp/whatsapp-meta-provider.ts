@@ -19,48 +19,51 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
     this.phoneNumberId = this.config.get<string>('WHATSAPP_PHONE_NUMBER_ID', '');
     this.apiUrl = this.config.get<string>('WHATSAPP_API_URL', 'https://graph.facebook.com/v20.0');
   }
-async sendTextMessage(
-  to: string,
-  body: string
-): Promise<WhatsAppSendResult> {
-  return this.retryUtil.withRetry(async () => {
-    const response = await fetch(
-      `${this.apiUrl}/${this.phoneNumberId}/messages`,
-      {
-        method: 'POST',
-        headers: this.headers(),
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: this.normalizeNumber(to),
-          type: 'template',
-          template: {
-            name: 'jaspers_market_plain_text_v1',
-            language: {
-              code: 'en_US',
-            },
-            components: [
-              {
-                type: 'body',
-                parameters: [
+  async sendTextMessage(
+    to: string,
+    body: string
+  ): Promise<WhatsAppSendResult> {
+    return this.retryUtil.withRetry(async () => {
+      const response = await fetch(
+        `${this.apiUrl}/${this.phoneNumberId}/messages`,
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify(
+            {
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: this.normalizeNumber(to),
+              type: 'template',
+              template: {
+                name: 'jaspers_market_plain_text_v1',
+                language: {
+                  code: 'en_US'
+                },
+                components: [
                   {
-                    type: 'text',
-                    text: body,
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      }
-    );
+                    type: 'body',
+                    parameters: [
+                      {
+                        type: 'text',
+                        text: body
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
 
-    return this.parseResponse(response);
-  }, {
-    maxRetries: 2,
-    context: 'WhatsApp.sendTemplate',
-  });
-}
+          ),
+        }
+      );
+
+      return this.parseResponse(response);
+    }, {
+      maxRetries: 2,
+      context: 'WhatsApp.sendTemplate',
+    });
+  }
 
   async sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult> {
     return this.retryUtil.withRetry(async () => {
