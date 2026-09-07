@@ -31,7 +31,7 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
           to: this.normalizeNumber(to),
           type: 'template',
           template: {
-            name: 'aspers_market_plain_text_v1',
+            name: 'jaspers_market_plain_text_v1',
             language: {
               code: 'en_US'
             }
