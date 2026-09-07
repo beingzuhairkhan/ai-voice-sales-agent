@@ -26,7 +26,6 @@ export class HealthService {
     private readonly config: ConfigService,
     @InjectModel(HealthCheck.name)
     private readonly healthModel: Model<HealthCheck>,
-    private readonly redis: Redis,
   ) {}
 
   async checkHealth(): Promise<{
@@ -71,7 +70,7 @@ export class HealthService {
 
       if (connection.readyState !== 1) {
         this.logger.warn(
-          `MongoDB is not connected. Mongoose readyState=${connection.readyState}`,
+          `MongoDB connection is not ready. readyState=${connection.readyState}`,
         );
 
         return {
@@ -97,9 +96,7 @@ export class HealthService {
       const message =
         err instanceof Error ? err.message : String(err);
 
-      this.logger.error(
-        `MongoDB health check failed: ${message}`,
-      );
+      this.logger.error(`MongoDB health check failed: ${message}`);
 
       return {
         status: 'down',
@@ -110,14 +107,24 @@ export class HealthService {
   private async checkRedis(): Promise<ServiceStatus> {
     const start = Date.now();
 
+    const redisUrl = this.config.get<string>(
+      'REDIS_URL',
+      'redis://localhost:6379',
+    );
+
+    const redis = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      lazyConnect: true,
+      retryStrategy: () => null,
+    });
+
     try {
-      const pong = await this.redis.ping();
+      await redis.connect();
+
+      const pong = await redis.ping();
 
       if (pong !== 'PONG') {
-        this.logger.warn(
-          `Redis returned unexpected response: ${pong}`,
-        );
-
         return {
           status: 'down',
         };
@@ -131,13 +138,13 @@ export class HealthService {
       const message =
         err instanceof Error ? err.message : String(err);
 
-      this.logger.error(
-        `Redis health check failed: ${message}`,
-      );
+      this.logger.error(`Redis health check failed: ${message}`);
 
       return {
         status: 'down',
       };
+    } finally {
+      redis.disconnect();
     }
   }
 
