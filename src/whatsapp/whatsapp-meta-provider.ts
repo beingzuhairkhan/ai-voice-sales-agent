@@ -20,72 +20,22 @@ export class WhatsAppMetaProvider implements WhatsAppProvider {
     this.apiUrl = this.config.get<string>('WHATSAPP_API_URL', 'https://graph.facebook.com/v20.0');
   }
 
- async sendTextMessage(
-  to: string,
-  body: string,
-): Promise<WhatsAppSendResult> {
-  return this.retryUtil.withRetry(
-    async () => {
-      const parameters = [
-        {
+  async sendTextMessage(to: string, body: string): Promise<WhatsAppSendResult> {
+    return this.retryUtil.withRetry(async () => {
+      const response = await fetch(`${this.apiUrl}/${this.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: this.normalizeNumber(to),
           type: 'text',
-          text: body,
-        },
-      ];
-
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: this.normalizeNumber(to),
-        type: 'template',
-        template: {
-          name: 'jaspers_market_plain_text_v1',
-          language: {
-            code: 'en_US',
-          },
-          components: [
-            {
-              type: 'body',
-              parameters,
-            },
-          ],
-        },
-      };
-
-      console.log('========== WHATSAPP TEMPLATE DEBUG ==========');
-      console.log('To:', to);
-      console.log('Normalized To:', this.normalizeNumber(to));
-      console.log('Body received:', body);
-      console.log('Body type:', typeof body);
-      console.log('Body length:', body?.length);
-      console.log('Template name:', payload.template.name);
-      console.log('Language:', payload.template.language.code);
-      console.log('Parameters:', JSON.stringify(parameters, null, 2));
-      console.log('Parameter count:', parameters.length);
-      console.log('Full payload:', JSON.stringify(payload, null, 2));
-      console.log('==============================================');
-
-      const response = await fetch(
-        `${this.apiUrl}/${this.phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: this.headers(),
-          body: JSON.stringify(payload),
-        },
-      );
-
-      console.log('WhatsApp HTTP status:', response.status);
-
+          text: { body, preview_url: false },
+        }),
+      });
       return this.parseResponse(response);
-    },
-    {
-      maxRetries: 2,
-      context: 'WhatsApp.sendTemplate',
-    },
-  );
-}
-
-
+    }, { maxRetries: 2, context: 'WhatsApp.sendText' });
+  }
 
   async sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult> {
     return this.retryUtil.withRetry(async () => {
