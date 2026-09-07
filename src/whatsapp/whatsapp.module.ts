@@ -4,6 +4,7 @@ import { WhatsAppMessage, WhatsAppMessageSchema } from './whatsapp-message.schem
 import { WhatsAppService } from './whatsapp.service';
 import { WhatsAppMetaProvider } from './whatsapp-meta-provider';
 import { WHATSAPP_PROVIDER } from './whatsapp-provider.interface';
+import { WhatsAppController } from './whatsapp.controller';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { WHATSAPP_PROVIDER } from './whatsapp-provider.interface';
       { name: WhatsAppMessage.name, schema: WhatsAppMessageSchema },
     ]),
   ],
+  controllers: [WhatsAppController],
   providers: [
     WhatsAppService,
     { provide: WHATSAPP_PROVIDER, useClass: WhatsAppMetaProvider },

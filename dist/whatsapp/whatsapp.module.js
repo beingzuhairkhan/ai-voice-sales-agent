@@ -13,6 +13,7 @@ const whatsapp_message_schema_1 = require("./whatsapp-message.schema");
 const whatsapp_service_1 = require("./whatsapp.service");
 const whatsapp_meta_provider_1 = require("./whatsapp-meta-provider");
 const whatsapp_provider_interface_1 = require("./whatsapp-provider.interface");
+const whatsapp_controller_1 = require("./whatsapp.controller");
 let WhatsAppModule = class WhatsAppModule {
 };
 exports.WhatsAppModule = WhatsAppModule;
@@ -23,6 +24,7 @@ exports.WhatsAppModule = WhatsAppModule = __decorate([
                 { name: whatsapp_message_schema_1.WhatsAppMessage.name, schema: whatsapp_message_schema_1.WhatsAppMessageSchema },
             ]),
         ],
+        controllers: [whatsapp_controller_1.WhatsAppController],
         providers: [
             whatsapp_service_1.WhatsAppService,
             { provide: whatsapp_provider_interface_1.WHATSAPP_PROVIDER, useClass: whatsapp_meta_provider_1.WhatsAppMetaProvider },
