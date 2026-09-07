@@ -40,4 +40,9 @@ export declare class WhatsAppService {
         page: number;
         limit: number;
     }>;
+    handleStatusWebhook(status: any): Promise<(import("mongoose").Document<unknown, {}, WhatsAppMessage, {}, {}> & WhatsAppMessage & Required<{
+        _id: Types.ObjectId;
+    }> & {
+        __v: number;
+    }) | null | undefined>;
 }

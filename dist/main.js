@@ -39,7 +39,7 @@ async function bootstrap() {
         .build();
     const document = swagger_1.SwaggerModule.createDocument(app, swaggerConfig);
     swagger_1.SwaggerModule.setup('docs', app, document);
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
     app.get(nestjs_pino_1.Logger).log(`Application running on port ${port}`, 'Bootstrap');
 }
 bootstrap();
