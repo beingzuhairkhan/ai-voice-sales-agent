@@ -24,12 +24,15 @@ export class WhatsAppService {
   async sendTextMessage(
     phoneNumber: string,
     message: string,
-    options?: { leadId?: Types.ObjectId | string; triggerAction?: string },
+    options?: {
+      leadId?: Types.ObjectId | string;
+      triggerAction?: string;
+    },
   ): Promise<WhatsAppMessage> {
     const record = await this.messageModel.create({
       phoneNumber,
       message,
-      type: 'text',
+      type: 'template',
       status: 'queued',
       leadId: options?.leadId
         ? typeof options.leadId === 'string'
@@ -40,18 +43,43 @@ export class WhatsAppService {
     });
 
     try {
-      const result = await this.provider.sendTextMessage(phoneNumber, message);
-      record.providerMessageId = result.providerMessageId;
+      const result = await this.provider.sendTextMessage(
+        phoneNumber,
+        message,
+      );
+
+      record.providerMessageId =
+        result.providerMessageId;
+
       record.status = 'pending';
-      record.sentAt = new Date();
-      record.deliveryInfo = result.rawResponse || {};
+
+      record.deliveryInfo =
+        result.rawResponse || {};
+
       return record.save();
     } catch (err) {
-      const errorMsg = (err as Error).message;
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : String(err);
+
       record.status = 'failed';
-      record.errorInfo = { message: errorMsg, timestamp: new Date().toISOString() };
+
+      record.errorInfo = {
+        message: errorMsg,
+        timestamp: new Date().toISOString(),
+      };
+
       await record.save();
-      this.logger.error({ err: errorMsg, phoneNumber }, 'WhatsApp text send failed');
+
+      this.logger.error(
+        {
+          err: errorMsg,
+          phoneNumber,
+        },
+        'WhatsApp template send failed',
+      );
+
       throw err;
     }
   }
@@ -178,79 +206,79 @@ export class WhatsAppService {
   }
 
   async handleStatusWebhook(status: any) {
-  const providerMessageId = status?.id;
-  const providerStatus = status?.status;
+    const providerMessageId = status?.id;
+    const providerStatus = status?.status;
 
-  if (!providerMessageId || !providerStatus) {
-    return;
-  }
+    if (!providerMessageId || !providerStatus) {
+      return;
+    }
 
-  const update: any = {
-    status: providerStatus,
-    updatedAt: new Date(),
-  };
-
-  // Save Meta failure details
-  if (providerStatus === 'failed') {
-    const error = status.errors?.[0];
-
-    update.deliveryInfo = {
-      statusTimestamp: status.timestamp
-        ? new Date(Number(status.timestamp) * 1000)
-        : undefined,
-
-      failure: {
-        code: error?.code,
-        title: error?.title,
-        message: error?.message,
-        details: error?.error_data?.details,
-        href: error?.href,
-      },
+    const update: any = {
+      status: providerStatus,
+      updatedAt: new Date(),
     };
+
+    // Save Meta failure details
+    if (providerStatus === 'failed') {
+      const error = status.errors?.[0];
+
+      update.deliveryInfo = {
+        statusTimestamp: status.timestamp
+          ? new Date(Number(status.timestamp) * 1000)
+          : undefined,
+
+        failure: {
+          code: error?.code,
+          title: error?.title,
+          message: error?.message,
+          details: error?.error_data?.details,
+          href: error?.href,
+        },
+      };
+    }
+
+    // Save status timestamps
+    if (providerStatus === 'sent') {
+      update['deliveryInfo.sentAt'] = new Date();
+    }
+
+    if (providerStatus === 'delivered') {
+      update['deliveryInfo.deliveredAt'] = new Date();
+    }
+
+    if (providerStatus === 'read') {
+      update['deliveryInfo.readAt'] = new Date();
+    }
+
+    const result =
+      await this.messageModel.findOneAndUpdate(
+        {
+          $or: [
+            {
+              'deliveryInfo.messages.providerMessageId':
+                providerMessageId,
+            },
+            {
+              'deliveryInfo.messages.id':
+                providerMessageId,
+            },
+          ],
+        },
+        {
+          $set: update,
+        },
+        {
+          new: true,
+        },
+      );
+
+    if (!result) {
+      this.logger.warn(
+        `WhatsApp message not found for WAMID: ${providerMessageId}`,
+      );
+    }
+
+    return result;
   }
-
-  // Save status timestamps
-  if (providerStatus === 'sent') {
-    update['deliveryInfo.sentAt'] = new Date();
-  }
-
-  if (providerStatus === 'delivered') {
-    update['deliveryInfo.deliveredAt'] = new Date();
-  }
-
-  if (providerStatus === 'read') {
-    update['deliveryInfo.readAt'] = new Date();
-  }
-
-  const result =
-    await this.messageModel.findOneAndUpdate(
-      {
-        $or: [
-          {
-            'deliveryInfo.messages.providerMessageId':
-              providerMessageId,
-          },
-          {
-            'deliveryInfo.messages.id':
-              providerMessageId,
-          },
-        ],
-      },
-      {
-        $set: update,
-      },
-      {
-        new: true,
-      },
-    );
-
-  if (!result) {
-    this.logger.warn(
-      `WhatsApp message not found for WAMID: ${providerMessageId}`,
-    );
-  }
-
-  return result;
-}
 
 }
