@@ -20,7 +20,7 @@ export declare class CallbackService {
         clarificationNeeded: boolean;
         confirmationMessage: string;
     }>;
-    bookCalendarEvent(callback: any, contextPhrase?: string): Promise<Callback>;
+    bookCalendarEvent(callback: any, contextPhrase?: string, leadId?: string): Promise<Callback>;
     private buildConfirmationMessage;
     getCallbacks(query: {
         page?: number;

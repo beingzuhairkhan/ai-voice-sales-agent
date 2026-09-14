@@ -22,7 +22,11 @@ let CallsController = class CallsController {
         this.callsService = callsService;
     }
     async startCall(dto) {
-        return this.callsService.startCall(dto.phoneNumber, dto.assistantId);
+        const assistandId = process.env.VAPI_ASSISTANT_ID;
+        if (!assistandId) {
+            throw new Error('VAPI_ASSISTANT_ID is not set in environment variables');
+        }
+        return this.callsService.startCall(dto.phoneNumber, assistandId);
     }
     async getCalls(query) {
         return this.callsService.getCalls(query);

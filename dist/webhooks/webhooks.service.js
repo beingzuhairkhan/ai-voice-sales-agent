@@ -181,13 +181,14 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
         const call = payload.message?.call;
         if (!callId)
             return { status: 'ignored', message: 'No internal call for end-of-call' };
-        const duration = call?.durationSeconds;
-        const transcript = call?.transcript;
-        const recordingUrl = call?.recordingUrl;
+        const duration = payload.message?.artifact?.durationSeconds;
+        const transcript = payload.message?.artifact?.transcript;
+        const recordingUrl = payload.message?.artifact?.recordingUrl;
+        const summary = payload.message?.artifact?.summary || '';
         if (transcript) {
             await this.callsService.saveTranscript(callId, transcript);
         }
-        await this.callsService.endCall(callId, duration, undefined);
+        await this.callsService.endCall(callId, duration, summary);
         if (recordingUrl) {
             await this.callsService.updateCallStatus(callId, 'ended', { recordingUrl });
         }
@@ -240,6 +241,7 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
             extractedData: extraction,
             temperature: 'HOT',
         });
+        console.log("Generated HOT WhatsApp message:", message);
         await this.actionEventModel.create({
             type: 'WHATSAPP_TRIGGERED',
             callId: new mongoose_2.Types.ObjectId(callId),

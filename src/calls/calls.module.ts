@@ -5,6 +5,7 @@ import { ActionEvent, ActionEventSchema } from '../common/types/action-event.sch
 import { CallsController } from './calls.controller';
 import { CallsService } from './calls.service';
 import { VapiModule } from '../vapi/vapi.module';
+import { LeadsModule } from '@/leads/leads.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { VapiModule } from '../vapi/vapi.module';
       { name: ActionEvent.name, schema: ActionEventSchema },
     ]),
     VapiModule,
+    LeadsModule,
   ],
   controllers: [CallsController],
   providers: [CallsService],

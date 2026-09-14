@@ -21,6 +21,7 @@ const qualification_module_1 = require("../qualification/qualification.module");
 const whatsapp_module_1 = require("../whatsapp/whatsapp.module");
 const callback_module_1 = require("../callback/callback.module");
 const vapi_module_1 = require("../vapi/vapi.module");
+const sarvam_module_1 = require("../sarvam/sarvam.module");
 let VoiceModule = class VoiceModule {
 };
 exports.VoiceModule = VoiceModule;
@@ -39,6 +40,7 @@ exports.VoiceModule = VoiceModule = __decorate([
             whatsapp_module_1.WhatsAppModule,
             callback_module_1.CallbackModule,
             vapi_module_1.VapiModule,
+            sarvam_module_1.SarvamModule
         ],
         controllers: [voice_tools_controller_1.VoiceToolsController],
         providers: [voice_tools_service_1.VoiceToolsService],

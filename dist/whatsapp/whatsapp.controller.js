@@ -28,6 +28,7 @@ let WhatsAppController = class WhatsAppController {
         throw new common_1.UnauthorizedException();
     }
     async whatsappWebhook(body) {
+        console.log('Received WhatsApp webhook:', body);
         if (body?.object !==
             'whatsapp_business_account') {
             return { success: true };
@@ -41,6 +42,25 @@ let WhatsAppController = class WhatsAppController {
             }
         }
         return { success: true };
+    }
+    async testSendMessage() {
+        const phoneNumber = '919967705134';
+        const message = `Hi Rahul, thanks for your enquiry.
+
+You are looking to build an e-commerce website for an electronics business.
+
+Your budget is around 52,000–60,000 INR and you're looking to launch within 1 week.
+
+You mentioned that you need online payments and WhatsApp integration.
+
+You can reach me directly on +91 9967705134 to discuss.`;
+        const result = await this.whatsappService.sendTextMessage(phoneNumber, message, {
+            triggerAction: 'test_send',
+        });
+        return {
+            success: true,
+            data: result,
+        };
     }
 };
 exports.WhatsAppController = WhatsAppController;
@@ -61,6 +81,12 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], WhatsAppController.prototype, "whatsappWebhook", null);
+__decorate([
+    (0, common_1.Post)('test-send'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], WhatsAppController.prototype, "testSendMessage", null);
 exports.WhatsAppController = WhatsAppController = __decorate([
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [whatsapp_service_1.WhatsAppService])

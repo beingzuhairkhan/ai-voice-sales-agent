@@ -24,4 +24,13 @@ export declare class LeadsService {
         page: number;
         limit: number;
     }>;
+    createInitialLead(params: {
+        callId: Types.ObjectId;
+        phoneNumber: string;
+        status: string;
+    }): Promise<import("mongoose").Document<unknown, {}, Lead, {}, {}> & Lead & Required<{
+        _id: Types.ObjectId;
+    }> & {
+        __v: number;
+    }>;
 }

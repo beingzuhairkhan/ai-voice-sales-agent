@@ -12,10 +12,12 @@ export interface SarvamSttResult {
 
 export interface SarvamTtsParams {
   text: string;
-  language: string;
+  language?: string;
   voice?: string;
   speed?: number;
+  sampleRate?: number;
 }
+
 
 export interface SarvamTtsResult {
   audioBase64: string;

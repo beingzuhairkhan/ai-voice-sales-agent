@@ -24,6 +24,10 @@ __decorate([
     __metadata("design:type", mongoose_2.Types.ObjectId)
 ], Callback.prototype, "callId", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({ type: mongoose_2.Types.ObjectId, ref: 'Call', index: true }),
+    __metadata("design:type", mongoose_2.Types.ObjectId)
+], Callback.prototype, "callbackCallId", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ type: String }),
     __metadata("design:type", String)
 ], Callback.prototype, "requestedTimePhrase", void 0);

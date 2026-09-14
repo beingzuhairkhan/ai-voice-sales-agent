@@ -38,6 +38,7 @@ export class WhatsAppController {
     @Post('webhooks/whatsapp')
     @HttpCode(200)
     async whatsappWebhook(@Body() body: any) {
+        console.log('Received WhatsApp webhook:', body);
         if (
             body?.object !==
             'whatsapp_business_account'
@@ -60,4 +61,32 @@ export class WhatsAppController {
 
         return { success: true };
     }
+
+     @Post('test-send')
+  async testSendMessage() {
+    const phoneNumber = '919967705134';
+
+    const message = `Hi Rahul, thanks for your enquiry.
+
+You are looking to build an e-commerce website for an electronics business.
+
+Your budget is around 52,000–60,000 INR and you're looking to launch within 1 week.
+
+You mentioned that you need online payments and WhatsApp integration.
+
+You can reach me directly on +91 9967705134 to discuss.`;
+
+    const result = await this.whatsappService.sendTextMessage(
+      phoneNumber,
+      message,
+      {
+        triggerAction: 'test_send',
+      },
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
 }

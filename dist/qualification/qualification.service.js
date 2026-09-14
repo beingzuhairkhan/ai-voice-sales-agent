@@ -57,6 +57,7 @@ let QualificationService = QualificationService_1 = class QualificationService {
     }
     async getAiClassification(input) {
         try {
+            console.log("extracted data before passing to ai ", input.extractedData, input.transcript);
             const userContent = JSON.stringify({
                 extractedLead: input.extractedData,
                 transcript: input.transcript || 'not provided',
@@ -69,6 +70,7 @@ let QualificationService = QualificationService_1 = class QualificationService {
                 schema: CLASSIFICATION_SCHEMA,
                 temperature: 0.2,
             });
+            console.log("AI classification result: ", result);
             const temperature = result.temperature || 'COLD';
             const intentScore = Math.max(0, Math.min(100, Math.round(Number(result.intentScore) || 0)));
             const confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));

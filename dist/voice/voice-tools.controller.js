@@ -20,17 +20,19 @@ const voice_tool_dto_1 = require("./dto/voice-tool.dto");
 const voice_tool_auth_guard_1 = require("../common/guards/voice-tool-auth.guard");
 const public_decorator_1 = require("../common/decorators/public.decorator");
 const config_1 = require("@nestjs/config");
+const sarvam_provider_1 = require("../sarvam/sarvam-provider");
+const followup_generation_service_1 = require("../ai/followup-generation.service");
 let VoiceToolsController = class VoiceToolsController {
-    constructor(voiceToolsService, config) {
+    constructor(voiceToolsService, sarvamTtsService, config, followupGen) {
         this.voiceToolsService = voiceToolsService;
+        this.sarvamTtsService = sarvamTtsService;
         this.config = config;
+        this.followupGen = followupGen;
     }
     async updateLead(dto) {
         return this.voiceToolsService.updateLead(dto);
     }
     async sendWhatsapp(body, headers, req) {
-        console.log('SEND WHATSAPP BODY:', body);
-        console.log('SEND WHATSAPP HEADERS:', headers);
         const expectedSecret = this.config.get('VAPI_WEBHOOK_SECRET');
         if (expectedSecret) {
             const authorization = headers['authorization'];
@@ -40,8 +42,43 @@ let VoiceToolsController = class VoiceToolsController {
                 return { status: 'unauthorized' };
             }
         }
-        console.log('SEND WHATSAPP: CALLING SERVICE');
-        const result = await this.voiceToolsService.sendWhatsapp(body);
+        const metadata = body?.message?.call?.metadata || {};
+        const callId = metadata.internalCallId;
+        const leadId = metadata.leadId;
+        const toolCall = body?.message?.toolCalls?.[0] ||
+            body?.message?.toolCallList?.[0];
+        const toolArguments = toolCall?.function?.arguments ||
+            toolCall?.arguments ||
+            {};
+        let args = toolArguments;
+        if (typeof toolArguments === 'string') {
+            try {
+                args = JSON.parse(toolArguments);
+            }
+            catch {
+                args = {};
+            }
+        }
+        const messageContent = args?.messageContent;
+        if (!callId) {
+            throw new common_1.BadRequestException('internalCallId missing from Vapi call metadata');
+        }
+        if (!leadId) {
+            throw new common_1.BadRequestException('leadId missing from Vapi call metadata');
+        }
+        if (!messageContent) {
+            throw new common_1.BadRequestException('messageContent missing from Vapi tool arguments');
+        }
+        const msg = await this.followupGen.generateFollowup({
+            transcript: messageContent,
+            temperature: 'HOT',
+        });
+        const result = await this.voiceToolsService.sendWhatsapp({
+            callId,
+            leadId,
+            vapiCallId: body?.message?.call?.id,
+            msg,
+        });
         console.log('SEND WHATSAPP RESULT:', result);
         return result;
     }
@@ -65,6 +102,55 @@ let VoiceToolsController = class VoiceToolsController {
     async endCall(dto) {
         return this.voiceToolsService.endCall(dto);
     }
+    async sarvamTts(body, res) {
+        try {
+            const message = body?.message;
+            if (!message || message.type !== 'voice-request') {
+                return res.status(400).json({
+                    error: 'Invalid Vapi request',
+                });
+            }
+            const text = message.text;
+            if (!text) {
+                return res.status(400).json({
+                    error: 'Missing text',
+                });
+            }
+            const sampleRate = message.sampleRate || 24000;
+            const allowedRates = [
+                8000,
+                16000,
+                22050,
+                24000,
+            ];
+            const sarvamSampleRate = allowedRates.includes(sampleRate)
+                ? sampleRate
+                : 24000;
+            const result = await this.sarvamTtsService.textToSpeech({
+                text,
+                language: 'hi-IN',
+                voice: 'ritu',
+                speed: 0.95,
+                sampleRate: sarvamSampleRate,
+            });
+            if (!result.audioBase64) {
+                return res.status(500).json({
+                    error: 'Sarvam returned no audio',
+                });
+            }
+            const wavBuffer = Buffer.from(result.audioBase64, 'base64');
+            const pcmBuffer = wavBuffer.subarray(44);
+            res.setHeader('Content-Type', 'audio/pcm');
+            res.setHeader('Content-Length', pcmBuffer.length);
+            return res.send(pcmBuffer);
+        }
+        catch (error) {
+            console.error('Server error:', error);
+            return res.status(500).json({
+                error: 'Internal server error',
+            });
+        }
+    }
 };
 exports.VoiceToolsController = VoiceToolsController;
 __decorate([
@@ -77,7 +163,9 @@ __decorate([
 ], VoiceToolsController.prototype, "updateLead", null);
 __decorate([
     (0, common_1.Post)('send-whatsapp'),
-    (0, swagger_1.ApiOperation)({ summary: 'Vapi tool: send WhatsApp message during call (HOT lead only)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Vapi tool: send WhatsApp message during call (HOT lead only)',
+    }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Headers)()),
     __param(2, (0, common_1.Req)()),
@@ -111,12 +199,22 @@ __decorate([
     __metadata("design:paramtypes", [voice_tool_dto_1.EndCallDto]),
     __metadata("design:returntype", Promise)
 ], VoiceToolsController.prototype, "endCall", null);
+__decorate([
+    (0, common_1.Post)('sarvam-tts'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], VoiceToolsController.prototype, "sarvamTts", null);
 exports.VoiceToolsController = VoiceToolsController = __decorate([
     (0, swagger_1.ApiTags)('Voice Tools'),
     (0, common_1.Controller)('voice/tools'),
     (0, common_1.UseGuards)(voice_tool_auth_guard_1.VoiceToolAuthGuard),
     (0, public_decorator_1.Public)(),
     __metadata("design:paramtypes", [voice_tools_service_1.VoiceToolsService,
-        config_1.ConfigService])
+        sarvam_provider_1.SarvamProvider,
+        config_1.ConfigService,
+        followup_generation_service_1.FollowupService])
 ], VoiceToolsController);
 //# sourceMappingURL=voice-tools.controller.js.map

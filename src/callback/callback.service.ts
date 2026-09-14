@@ -24,6 +24,7 @@ export class CallbackService {
     reason?: string;
   }): Promise<{ callback: Callback; clarificationNeeded: boolean; confirmationMessage: string }> {
     const parseResult = await this.parserService.parseCallbackRequest(params.requestedTimePhrase);
+    console.log('Parsed callback request:', parseResult);
 
     const callback: any = await this.callbackModel.create({
       leadId: typeof params?.leadId === 'string' ? new Types.ObjectId(params.leadId) : undefined,
@@ -50,7 +51,7 @@ export class CallbackService {
     }
 
     // Book the calendar event immediately for confirmed callbacks
-    const bookingResult = await this.bookCalendarEvent(callback, params.requestedTimePhrase);
+    const bookingResult = await this.bookCalendarEvent(callback, params.requestedTimePhrase , params.leadId?.toString());
 
     return {
       callback: bookingResult,
@@ -59,7 +60,7 @@ export class CallbackService {
     };
   }
 
-  async bookCalendarEvent(callback: any, contextPhrase?: string): Promise<Callback> {
+  async bookCalendarEvent(callback: any, contextPhrase?: string , leadId?: string): Promise<Callback> {
     if (!callback.parsedDateTime) {
       this.logger.warn({ callbackId: callback._id?.toString() }, 'Cannot book calendar event without parsed date');
       return callback;
@@ -71,7 +72,7 @@ export class CallbackService {
     try {
       const event = await this.calendarProvider.createEvent({
         summary: 'Sales Callback - E-commerce Website Development',
-        description: `Callback requested by customer.\nOriginal request: "${contextPhrase || callback.requestedTimePhrase}"\nLead ID: ${callback.leadId}`,
+        description: `Callback requested by customer.\nOriginal request: "${contextPhrase || callback.requestedTimePhrase}"\nLead ID: ${leadId || 'N/A'}`,
         startTime,
         endTime,
         timezone: callback.timezone,

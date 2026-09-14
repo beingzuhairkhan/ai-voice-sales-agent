@@ -31,6 +31,7 @@ let CallbackService = CallbackService_1 = class CallbackService {
     }
     async requestCallback(params) {
         const parseResult = await this.parserService.parseCallbackRequest(params.requestedTimePhrase);
+        console.log('Parsed callback request:', parseResult);
         const callback = await this.callbackModel.create({
             leadId: typeof params?.leadId === 'string' ? new mongoose_2.Types.ObjectId(params.leadId) : undefined,
             callId: params.callId
@@ -52,14 +53,14 @@ let CallbackService = CallbackService_1 = class CallbackService {
                 confirmationMessage: 'I want to make sure I call you at the right time. Could you tell me a more specific day and time? For example, "tomorrow at 10 AM" or "Monday afternoon".',
             };
         }
-        const bookingResult = await this.bookCalendarEvent(callback, params.requestedTimePhrase);
+        const bookingResult = await this.bookCalendarEvent(callback, params.requestedTimePhrase, params.leadId?.toString());
         return {
             callback: bookingResult,
             clarificationNeeded: false,
             confirmationMessage: this.buildConfirmationMessage(bookingResult),
         };
     }
-    async bookCalendarEvent(callback, contextPhrase) {
+    async bookCalendarEvent(callback, contextPhrase, leadId) {
         if (!callback.parsedDateTime) {
             this.logger.warn({ callbackId: callback._id?.toString() }, 'Cannot book calendar event without parsed date');
             return callback;
@@ -69,7 +70,7 @@ let CallbackService = CallbackService_1 = class CallbackService {
         try {
             const event = await this.calendarProvider.createEvent({
                 summary: 'Sales Callback - E-commerce Website Development',
-                description: `Callback requested by customer.\nOriginal request: "${contextPhrase || callback.requestedTimePhrase}"\nLead ID: ${callback.leadId}`,
+                description: `Callback requested by customer.\nOriginal request: "${contextPhrase || callback.requestedTimePhrase}"\nLead ID: ${leadId || 'N/A'}`,
                 startTime,
                 endTime,
                 timezone: callback.timezone,

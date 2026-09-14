@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-export type CallbackStatus = 'requested' | 'confirmed' | 'scheduled' | 'completed' | 'cancelled' | 'failed';
+export type CallbackStatus = 'requested' | 'confirmed' | 'scheduled' | 'completed' | 'cancelled' | 'failed' | 'queued';
 
 export type CallbackDocument = Callback & Document;
 
@@ -14,6 +14,9 @@ export class Callback {
 
   @Prop({ type: Types.ObjectId, ref: 'Call', index: true })
   callId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Call', index: true })
+  callbackCallId?: Types.ObjectId;
 
   @Prop({ type: String })
   requestedTimePhrase?: string;

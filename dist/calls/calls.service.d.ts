@@ -3,15 +3,22 @@ import { Model, Types } from 'mongoose';
 import { Call, CallStatus } from './call.schema';
 import { VapiProvider } from '../vapi/vapi-provider';
 import { ActionEvent } from '../common/types/action-event.schema';
+import { LeadsService } from '@/leads/leads.service';
 export declare class CallsService {
     private callModel;
     private actionEventModel;
     private vapiProvider;
     private config;
+    private leadsService;
     private readonly logger;
     private readonly defaultPhoneNumber;
-    constructor(callModel: Model<Call>, actionEventModel: Model<ActionEvent>, vapiProvider: VapiProvider, config: ConfigService);
-    startCall(phoneNumber?: string, assistantId?: string): Promise<{
+    constructor(callModel: Model<Call>, actionEventModel: Model<ActionEvent>, vapiProvider: VapiProvider, config: ConfigService, leadsService: LeadsService);
+    startCall(phoneNumber?: string, assistantId?: string, context?: {
+        callbackId?: string;
+        originalCallId?: string;
+        transcript?: string;
+        lead?: any;
+    }): Promise<{
         callId: string;
         vapiCallId: string;
         status: string;

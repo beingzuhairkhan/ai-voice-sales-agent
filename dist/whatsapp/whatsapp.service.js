@@ -34,7 +34,7 @@ let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
         const record = await this.messageModel.create({
             phoneNumber,
             message,
-            type: 'text',
+            type: 'template',
             status: 'queued',
             leadId: options?.leadId
                 ? typeof options.leadId === 'string'
@@ -44,19 +44,29 @@ let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
             triggerAction: options?.triggerAction,
         });
         try {
+            console.log("Sending WhatsApp text message to:", phoneNumber, "Message:", message);
             const result = await this.provider.sendTextMessage(phoneNumber, message);
-            record.providerMessageId = result.providerMessageId;
+            record.providerMessageId =
+                result.providerMessageId;
             record.status = 'pending';
-            record.sentAt = new Date();
-            record.deliveryInfo = result.rawResponse || {};
+            record.deliveryInfo =
+                result.rawResponse || {};
             return record.save();
         }
         catch (err) {
-            const errorMsg = err.message;
+            const errorMsg = err instanceof Error
+                ? err.message
+                : String(err);
             record.status = 'failed';
-            record.errorInfo = { message: errorMsg, timestamp: new Date().toISOString() };
+            record.errorInfo = {
+                message: errorMsg,
+                timestamp: new Date().toISOString(),
+            };
             await record.save();
-            this.logger.error({ err: errorMsg, phoneNumber }, 'WhatsApp text send failed');
+            this.logger.error({
+                err: errorMsg,
+                phoneNumber,
+            }, 'WhatsApp template send failed');
             throw err;
         }
     }

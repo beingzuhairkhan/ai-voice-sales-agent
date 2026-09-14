@@ -121,6 +121,23 @@ let LeadsService = LeadsService_1 = class LeadsService {
         ]);
         return { leads, total, page, limit };
     }
+    async createInitialLead(params) {
+        return this.leadModel.create({
+            callId: params.callId,
+            phoneNumber: params.phoneNumber,
+            status: params.status,
+            budget: null,
+            products: null,
+            productCount: null,
+            timeline: null,
+            features: [],
+            temperature: null,
+            intentScore: null,
+            confidence: null,
+            hotWhatsappSent: false,
+            createdAt: new Date(),
+        });
+    }
 };
 exports.LeadsService = LeadsService;
 exports.LeadsService = LeadsService = LeadsService_1 = __decorate([

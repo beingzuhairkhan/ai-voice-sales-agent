@@ -12,6 +12,7 @@ import { QualificationModule } from '../qualification/qualification.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { CallbackModule } from '../callback/callback.module';
 import { VapiModule } from '../vapi/vapi.module';
+import { SarvamModule } from '@/sarvam/sarvam.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { VapiModule } from '../vapi/vapi.module';
     WhatsAppModule,
     CallbackModule,
     VapiModule,
+    SarvamModule
   ],
   controllers: [VoiceToolsController],
   providers: [VoiceToolsService],

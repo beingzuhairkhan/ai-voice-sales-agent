@@ -80,6 +80,7 @@ export class QualificationService {
     reasoning: string;
   }> {
     try {
+      console.log("extracted data before passing to ai " , input.extractedData , input.transcript) ;
       const userContent = JSON.stringify({
         extractedLead: input.extractedData,
         transcript: input.transcript || 'not provided',
@@ -92,6 +93,8 @@ export class QualificationService {
         schema: CLASSIFICATION_SCHEMA,
         temperature: 0.2,
       });
+
+      console.log("AI classification result: ", result);
 
       const temperature = (result.temperature as LeadTemperature) || 'COLD';
       const intentScore = Math.max(0, Math.min(100, Math.round(Number(result.intentScore) || 0)));

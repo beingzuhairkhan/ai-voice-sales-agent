@@ -12,6 +12,10 @@ const mongoose_1 = require("@nestjs/mongoose");
 const call_schema_1 = require("../calls/call.schema");
 const jobs_service_1 = require("./jobs.service");
 const followup_module_1 = require("../followup/followup.module");
+const callback_module_1 = require("../callback/callback.module");
+const leads_module_1 = require("../leads/leads.module");
+const conversations_module_1 = require("../conversations/conversations.module");
+const calls_module_1 = require("../calls/calls.module");
 let JobsModule = class JobsModule {
 };
 exports.JobsModule = JobsModule;
@@ -20,6 +24,10 @@ exports.JobsModule = JobsModule = __decorate([
         imports: [
             mongoose_1.MongooseModule.forFeature([{ name: call_schema_1.Call.name, schema: call_schema_1.CallSchema }]),
             followup_module_1.FollowupModule,
+            callback_module_1.CallbackModule,
+            leads_module_1.LeadsModule,
+            conversations_module_1.ConversationsModule,
+            calls_module_1.CallsModule
         ],
         providers: [jobs_service_1.JobsService],
         exports: [jobs_service_1.JobsService],

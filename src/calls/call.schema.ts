@@ -12,6 +12,14 @@ export type CallStatus =
   | 'cancelled'
   | 'queued';
 
+export type FollowUpStatus =
+  | 'pending'
+  | 'scheduled'
+  | 'in-progress'
+  | 'completed'
+  | 'cancelled';
+
+
 export type CallDocument = Call & Document;
 
 @Schema({ timestamps: true, collection: 'calls' })
@@ -24,7 +32,7 @@ export class Call {
   @Prop({ required: true, index: true })
   phoneNumber!: string;
 
-  @Prop({ required: true, enum: ['initiated', 'ringing', 'in-progress', 'ended', 'failed', 'no-answer', 'busy', 'cancelled' , 'queued'], default: 'initiated' })
+  @Prop({ required: true, enum: ['initiated', 'ringing', 'in-progress', 'ended', 'failed', 'no-answer', 'busy', 'cancelled', 'queued'], default: 'initiated' })
   status!: CallStatus;
 
   @Prop({ type: Date })
@@ -53,6 +61,14 @@ export class Call {
 
   @Prop({ type: Object, default: {} })
   metadata!: Record<string, any>;
+
+  @Prop({
+    required: true,
+    enum: ['pending', 'scheduled', 'in-progress', 'completed', 'cancelled'],
+    default: 'pending',
+  })
+  followUpStatus!: FollowUpStatus;
+
 
   createdAt!: Date;
   updatedAt!: Date;

@@ -23,27 +23,35 @@ let FollowupService = FollowupService_1 = class FollowupService {
         this.llmProvider = llmProvider;
         this.config = config;
         this.logger = new common_1.Logger(FollowupService_1.name);
+        this.resumeUrl = "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
+        this.systemOverviewUrl = "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
         this.developerName = this.config.get('DEVELOPER_NAME', 'Developer');
         this.developerMobile = this.config.get('DEVELOPER_MOBILE_NUMBER', '');
     }
     async generateFollowup(params) {
         const { transcript, extractedData, temperature } = params;
         const leadSummary = JSON.stringify({
-            name: extractedData.name,
-            productDescription: extractedData.productDescription,
-            productCount: extractedData.productCount,
-            budget: extractedData.budget,
-            currency: extractedData.currency,
-            timeline: extractedData.timeline,
-            requiredFeatures: extractedData.requiredFeatures,
-            painPoints: extractedData.painPoints,
-            barriers: extractedData.barriers,
-            isDecisionMaker: extractedData.isDecisionMaker,
+            name: extractedData?.name,
+            productDescription: extractedData?.productDescription,
+            productCount: extractedData?.productCount,
+            budget: extractedData?.budget,
+            currency: extractedData?.currency,
+            timeline: extractedData?.timeline,
+            requiredFeatures: extractedData?.requiredFeatures,
+            painPoints: extractedData?.painPoints,
+            barriers: extractedData?.barriers,
+            isDecisionMaker: extractedData?.isDecisionMaker,
             temperature,
-            language: extractedData.language,
+            language: extractedData?.language,
         }, null, 2);
-        const userContent = `Developer name: ${this.developerName}
+        const userContent = `
 Developer mobile: ${this.developerMobile}
+
+Resume URL:
+${this.resumeUrl}
+
+System overview URL:
+${this.systemOverviewUrl}
 
 Lead information:
 ${leadSummary}
@@ -51,7 +59,10 @@ ${leadSummary}
 Conversation transcript:
 ${transcript}
 
-Generate a personalized WhatsApp follow-up message referencing the actual conversation above.`;
+Extract the WhatsApp template parameters according to the system instructions.
+
+Return ONLY valid JSON.
+`;
         try {
             const message = await this.llmProvider.chatCompletion([
                 { role: 'system', content: followup_generation_prompt_1.FOLLOWUP_GENERATION_PROMPT },
@@ -64,6 +75,7 @@ Generate a personalized WhatsApp follow-up message referencing the actual conver
             if (!finalMessage.includes(this.developerMobile)) {
                 finalMessage += `\n\nContact: ${this.developerName} — ${this.developerMobile}`;
             }
+            console.log('Generated follow-up message:', finalMessage);
             return finalMessage;
         }
         catch (err) {
@@ -71,19 +83,29 @@ Generate a personalized WhatsApp follow-up message referencing the actual conver
             return this.fallbackMessage(extractedData);
         }
     }
-    fallbackMessage(data) {
-        const greeting = data.name ? `Namaste ${data.name},` : 'Namaste,';
-        const products = data.productDescription ? `for your ${data.productDescription} business` : 'for your business';
-        const budget = data.budget ? `We can work within your budget of ${data.budget} ${data.currency || 'INR'}.` : '';
-        const features = data.requiredFeatures.length > 0 ? `Features you mentioned: ${data.requiredFeatures.join(', ')}.` : '';
-        return `${greeting}
-
-Thank you for speaking with me today about your e-commerce website ${products}. ${budget} ${features}
-
-I'd love to help you build this. Please feel free to reach out:
-${this.developerName} — ${this.developerMobile}
-
-Looking forward to hearing from you.`;
+    fallbackMessage(extractedData) {
+        const data = extractedData || {};
+        const businessName = data.name || data.productDescription || "your business";
+        const productCount = data.productCount || "the required";
+        const budget = data.budget || "to be discussed";
+        const timeline = data.timeline || "to be discussed";
+        const rawFeatures = data.requiredFeatures;
+        const requiredFeatures = (rawFeatures && typeof rawFeatures === 'string' && rawFeatures.trim().length > 0)
+            ? rawFeatures
+            : (Array.isArray(rawFeatures) && rawFeatures.length > 0)
+                ? rawFeatures.join(', ')
+                : "the required features";
+        console.log('Fallback follow-up message:');
+        return JSON.stringify({
+            businessName,
+            productCount,
+            budget,
+            timeline,
+            requiredFeatures,
+            developerMobile: this.developerMobile,
+            resumeUrl: this.resumeUrl,
+            systemOverviewUrl: this.systemOverviewUrl,
+        }, null, 2);
     }
 };
 exports.FollowupService = FollowupService;

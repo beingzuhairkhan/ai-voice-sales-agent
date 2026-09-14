@@ -1,5 +1,6 @@
 import { Document, Types } from 'mongoose';
 export type CallStatus = 'initiated' | 'ringing' | 'in-progress' | 'ended' | 'failed' | 'no-answer' | 'busy' | 'cancelled' | 'queued';
+export type FollowUpStatus = 'pending' | 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
 export type CallDocument = Call & Document;
 export declare class Call {
     _id: Types.ObjectId;
@@ -15,6 +16,7 @@ export declare class Call {
     recordingUrl?: string;
     leadId?: Types.ObjectId;
     metadata: Record<string, any>;
+    followUpStatus: FollowUpStatus;
     createdAt: Date;
     updatedAt: Date;
 }

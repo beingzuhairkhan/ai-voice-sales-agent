@@ -67,6 +67,7 @@ export interface VapiWebhookEvent {
             stereoRecordingUrl?: string;
             durationSeconds?: number;
             durationMs?: number;
+            summary?: string;
         };
         toolCall?: {
             name: string;

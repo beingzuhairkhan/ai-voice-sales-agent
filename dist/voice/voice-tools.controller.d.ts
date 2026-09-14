@@ -2,10 +2,15 @@ import { VoiceToolsService } from './voice-tools.service';
 import { UpdateLeadDto, GetLeadContextDto, EndCallDto } from './dto/voice-tool.dto';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { SarvamProvider } from '@/sarvam/sarvam-provider';
+import type { Response } from 'express';
+import { FollowupService as FollowupGenerationService } from '../ai/followup-generation.service';
 export declare class VoiceToolsController {
     private voiceToolsService;
+    private sarvamTtsService;
     private config;
-    constructor(voiceToolsService: VoiceToolsService, config: ConfigService);
+    private followupGen;
+    constructor(voiceToolsService: VoiceToolsService, sarvamTtsService: SarvamProvider, config: ConfigService, followupGen: FollowupGenerationService);
     updateLead(dto: UpdateLeadDto): Promise<{
         success: boolean;
         leadId: string;
@@ -49,4 +54,5 @@ export declare class VoiceToolsController {
         success: boolean;
         message: string;
     }>;
+    sarvamTts(body: any, res: Response): Promise<Response<any, Record<string, any>>>;
 }

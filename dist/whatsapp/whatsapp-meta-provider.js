@@ -22,9 +22,47 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
         this.accessToken = this.config.get('WHATSAPP_ACCESS_TOKEN', '');
         this.phoneNumberId = this.config.get('WHATSAPP_PHONE_NUMBER_ID', '');
         this.apiUrl = this.config.get('WHATSAPP_API_URL', 'https://graph.facebook.com/v20.0');
+        this.developerMobile =
+            process.env.DEVELOPER_MOBILE || '';
+        this.resumeUrl =
+            process.env.RESUME_URL || '';
+        this.systemOverviewUrl =
+            process.env.SYSTEM_OVERVIEW_URL || '';
+    }
+    extractTemplateParams(message) {
+        const text = message.trim();
+        try {
+            if (text.startsWith('{') && text.endsWith('}')) {
+                const parsed = JSON.parse(text);
+                return {
+                    businessName: parsed.businessName || "your business",
+                    productCount: parsed.productCount || "the required",
+                    budget: parsed.budget || "to be discussed",
+                    timeline: parsed.timeline || "to be discussed",
+                    requiredFeatures: parsed.requiredFeatures || "the required features",
+                    developerMobile: parsed.developerMobile || this.developerMobile || "+910000000000",
+                    resumeUrl: parsed.resumeUrl || this.resumeUrl || "https://example.com",
+                    systemOverviewUrl: parsed.systemOverviewUrl || this.systemOverviewUrl || "https://example.com",
+                };
+            }
+        }
+        catch (e) {
+        }
+        return {
+            businessName: "your business",
+            productCount: "the required",
+            budget: "to be discussed",
+            timeline: "to be discussed",
+            requiredFeatures: "the required features",
+            developerMobile: this.developerMobile || "+910000000000",
+            resumeUrl: this.resumeUrl || "https://example.com",
+            systemOverviewUrl: this.systemOverviewUrl || "https://example.com",
+        };
     }
     async sendTextMessage(to, body) {
         return this.retryUtil.withRetry(async () => {
+            console.log("Sending WhatsApp message to:", body);
+            const params = this.extractTemplateParams(body);
             const response = await fetch(`${this.apiUrl}/${this.phoneNumberId}/messages`, {
                 method: 'POST',
                 headers: this.headers(),
@@ -32,12 +70,59 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
                     messaging_product: 'whatsapp',
                     recipient_type: 'individual',
                     to: this.normalizeNumber(to),
-                    type: 'text',
-                    text: { body, preview_url: false },
+                    type: 'template',
+                    template: {
+                        name: 'ecommerce_lead_followup_v2',
+                        language: {
+                            code: 'en',
+                        },
+                        components: [
+                            {
+                                type: 'body',
+                                parameters: [
+                                    {
+                                        type: 'text',
+                                        text: params.businessName,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.productCount,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.budget,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.timeline,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.requiredFeatures,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.developerMobile,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.resumeUrl,
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: params.systemOverviewUrl,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
                 }),
             });
             return this.parseResponse(response);
-        }, { maxRetries: 2, context: 'WhatsApp.sendText' });
+        }, {
+            maxRetries: 2,
+            context: 'WhatsApp.sendText',
+        });
     }
     async sendDocument(to, documentUrl, caption) {
         return this.retryUtil.withRetry(async () => {

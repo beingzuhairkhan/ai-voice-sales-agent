@@ -415,7 +415,12 @@ export class VoiceToolsService {
     //   throw new BadRequestException('Invalid call ID format');
     // }
     const call = await this.callModel
-      .findOne({ vapiCallId: callId })
+      .findOne({
+        $or: [
+          { _id: new Types.ObjectId(callId) },
+          { vapiCallId: callId },
+        ],
+      })
       .exec();
 
     console.log("voice service validateActiveCall", call)

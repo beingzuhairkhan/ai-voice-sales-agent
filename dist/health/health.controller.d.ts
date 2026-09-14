@@ -6,11 +6,11 @@ export declare class HealthController {
         status: "healthy" | "degraded" | "unhealthy";
         services: {
             mongodb: {
-                status: string;
+                status: "up" | "down";
                 latencyMs?: number;
             };
             redis: {
-                status: string;
+                status: "up" | "down";
                 latencyMs?: number;
             };
             providers: {

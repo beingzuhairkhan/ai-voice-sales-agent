@@ -1,10 +1,11 @@
 import { Document, Types } from 'mongoose';
-export type CallbackStatus = 'requested' | 'confirmed' | 'scheduled' | 'completed' | 'cancelled' | 'failed';
+export type CallbackStatus = 'requested' | 'confirmed' | 'scheduled' | 'completed' | 'cancelled' | 'failed' | 'queued';
 export type CallbackDocument = Callback & Document;
 export declare class Callback {
     _id: Types.ObjectId;
     leadId: Types.ObjectId;
     callId?: Types.ObjectId;
+    callbackCallId?: Types.ObjectId;
     requestedTimePhrase?: string;
     parsedDateTime?: Date;
     timezone: string;

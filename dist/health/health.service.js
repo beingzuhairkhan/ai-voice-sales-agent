@@ -31,56 +31,96 @@ let HealthService = HealthService_1 = class HealthService {
             this.checkMongo(),
             this.checkRedis(),
         ]);
-        const providerConfig = this.checkProviderConfig();
-        const allHealthy = mongoHealth.status === 'up' &&
+        const providers = this.checkProviderConfig();
+        const databaseHealthy = mongoHealth.status === 'up' &&
             redisHealth.status === 'up';
-        const status = allHealthy ? 'healthy' : 'degraded';
+        const status = databaseHealthy ? 'healthy' : 'degraded';
         return {
             status,
             services: {
                 mongodb: mongoHealth,
                 redis: redisHealth,
-                providers: providerConfig,
+                providers,
             },
             timestamp: new Date().toISOString(),
         };
     }
     async checkMongo() {
+        const start = Date.now();
         try {
-            const start = Date.now();
-            const res = await this.healthModel.db.admin().ping();
-            const latency = Date.now() - start;
-            return { status: res.ok === 1 ? 'up' : 'down', latencyMs: latency };
+            const connection = this.healthModel.db;
+            if (connection.readyState !== 1) {
+                this.logger.warn(`MongoDB connection is not ready. readyState=${connection.readyState}`);
+                return {
+                    status: 'down',
+                };
+            }
+            if (!connection.db) {
+                this.logger.warn('MongoDB database instance is unavailable');
+                return {
+                    status: 'down',
+                };
+            }
+            await connection.db.command({ ping: 1 });
+            return {
+                status: 'up',
+                latencyMs: Date.now() - start,
+            };
         }
         catch (err) {
-            this.logger.warn({ err: err.message }, 'MongoDB health check failed');
-            return { status: 'down' };
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error(`MongoDB health check failed: ${message}`);
+            return {
+                status: 'down',
+            };
         }
     }
     async checkRedis() {
+        const start = Date.now();
+        const redisUrl = this.config.get('REDIS_URL', 'redis://localhost:6379');
+        const redis = new ioredis_1.Redis(redisUrl, {
+            maxRetriesPerRequest: 1,
+            connectTimeout: 3000,
+            lazyConnect: true,
+            retryStrategy: () => null,
+        });
         try {
-            const redisUrl = this.config.get('REDIS_URL', 'redis://localhost:6379');
-            const redis = new ioredis_1.Redis(redisUrl, { maxRetriesPerRequest: 1, retryStrategy: () => null });
-            const start = Date.now();
+            await redis.connect();
             const pong = await redis.ping();
-            const latency = Date.now() - start;
-            redis.disconnect();
-            return { status: pong === 'PONG' ? 'up' : 'down', latencyMs: latency };
+            if (pong !== 'PONG') {
+                return {
+                    status: 'down',
+                };
+            }
+            return {
+                status: 'up',
+                latencyMs: Date.now() - start,
+            };
         }
         catch (err) {
-            this.logger.warn({ err: err.message }, 'Redis health check failed');
-            return { status: 'down' };
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error(`Redis health check failed: ${message}`);
+            return {
+                status: 'down',
+            };
+        }
+        finally {
+            redis.disconnect();
         }
     }
     checkProviderConfig() {
         return {
-            vapi: Boolean(this.config.get('VAPI_API_KEY')),
-            sarvam: Boolean(this.config.get('SARVAM_API_KEY')),
-            openai: Boolean(this.config.get('OPENAI_API_KEY')),
-            whatsapp: Boolean(this.config.get('WHATSAPP_ACCESS_TOKEN')),
-            googleCalendar: Boolean(this.config.get('GOOGLE_CLIENT_ID') &&
-                this.config.get('GOOGLE_REFRESH_TOKEN')),
+            vapi: this.hasConfig('VAPI_API_KEY'),
+            sarvam: this.hasConfig('SARVAM_API_KEY'),
+            openai: this.hasConfig('OPENAI_API_KEY'),
+            whatsapp: this.hasConfig('WHATSAPP_ACCESS_TOKEN'),
+            googleCalendar: this.hasConfig('GOOGLE_CLIENT_ID') &&
+                this.hasConfig('GOOGLE_REFRESH_TOKEN'),
         };
+    }
+    hasConfig(key) {
+        const value = this.config.get(key);
+        return Boolean(value && value.trim().length > 0);
     }
 };
 exports.HealthService = HealthService;

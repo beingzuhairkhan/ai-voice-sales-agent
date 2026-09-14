@@ -63,6 +63,14 @@ __decorate([
     (0, mongoose_1.Prop)({ type: Object, default: {} }),
     __metadata("design:type", Object)
 ], Call.prototype, "metadata", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({
+        required: true,
+        enum: ['pending', 'scheduled', 'in-progress', 'completed', 'cancelled'],
+        default: 'pending',
+    }),
+    __metadata("design:type", String)
+], Call.prototype, "followUpStatus", void 0);
 exports.Call = Call = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true, collection: 'calls' })
 ], Call);

@@ -322,7 +322,12 @@ let VoiceToolsService = VoiceToolsService_1 = class VoiceToolsService {
     }
     async validateActiveCall(callId) {
         const call = await this.callModel
-            .findOne({ vapiCallId: callId })
+            .findOne({
+            $or: [
+                { _id: new mongoose_1.Types.ObjectId(callId) },
+                { vapiCallId: callId },
+            ],
+        })
             .exec();
         console.log("voice service validateActiveCall", call);
         if (!call)

@@ -5,6 +5,7 @@ import { Model, Types } from 'mongoose';
 import { Call, CallStatus } from './call.schema';
 import { VapiProvider } from '../vapi/vapi-provider';
 import { ActionEvent } from '../common/types/action-event.schema';
+import { LeadsService } from '@/leads/leads.service';
 
 @Injectable()
 export class CallsService {
@@ -16,11 +17,17 @@ export class CallsService {
     @InjectModel(ActionEvent.name) private actionEventModel: Model<ActionEvent>,
     private vapiProvider: VapiProvider,
     private config: ConfigService,
+    private leadsService: LeadsService,
   ) {
     this.defaultPhoneNumber = this.config.get<string>('VAPI_PHONE_NUMBER', '+918688664337');
   }
 
-  async startCall(phoneNumber?: string, assistantId?: string): Promise<{
+  async startCall(phoneNumber?: string, assistantId?: string, context?: {
+    callbackId?: string;
+    originalCallId?: string;
+    transcript?: string;
+    lead?: any;
+  },): Promise<{
     callId: string;
     vapiCallId: string;
     status: string;
@@ -33,20 +40,67 @@ export class CallsService {
       phoneNumber: targetPhone,
       status: 'initiated' as CallStatus,
       startTime: new Date(),
-      metadata: { assistantId: assistantId || this.config.get<string>('VAPI_ASSISTANT_ID') },
+      metadata: {
+        assistantId:
+          assistantId ||
+          this.config.get<string>('VAPI_ASSISTANT_ID'),
+
+        callbackId: context?.callbackId,
+        originalCallId: context?.originalCallId,
+
+        // Store context so webhook/other services can access it
+        callbackContext: context
+          ? {
+            transcript: context.transcript,
+            lead: context.lead,
+          }
+          : undefined,
+      },
     });
 
+    // create lead immediately
+
+    const lead = await this.leadsService.createInitialLead({
+      callId: callDoc._id,
+      phoneNumber: targetPhone,
+      status: 'IN_PROGRESS',
+    })
+
+    callDoc.leadId = lead._id;
+    await callDoc.save();
+
     // Record action event
-    await this.recordAction(callDoc._id, 'CALL_STARTED', { phoneNumber: targetPhone });
+    await this.recordAction(
+      callDoc._id,
+      'CALL_STARTED',
+      {
+        phoneNumber: targetPhone,
+        callbackId: context?.callbackId,
+        originalCallId: context?.originalCallId,
+      },
+    );
 
     try {
       const vapiResult = await this.vapiProvider.startOutboundCall({
         phoneNumber: targetPhone,
         assistantId,
-        metadata: { internalCallId: (callDoc._id as any).toString() },
+        metadata: {
+          internalCallId: callDoc._id.toString(),
+          leadId: lead._id.toString(),
+          callId: callDoc._id.toString(),
+
+          callbackId: context?.callbackId,
+          originalCallId: context?.originalCallId,
+
+          // Pass context to Vapi
+          callbackContext: context
+            ? JSON.stringify(context)
+            : undefined,
+        },
       });
 
       // Save Vapi call ID
+
       callDoc.vapiCallId = vapiResult.vapiCallId;
       callDoc.status = vapiResult.status as CallStatus;
       await callDoc.save();

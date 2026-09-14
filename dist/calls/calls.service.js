@@ -21,30 +21,63 @@ const mongoose_2 = require("mongoose");
 const call_schema_1 = require("./call.schema");
 const vapi_provider_1 = require("../vapi/vapi-provider");
 const action_event_schema_1 = require("../common/types/action-event.schema");
+const leads_service_1 = require("../leads/leads.service");
 let CallsService = CallsService_1 = class CallsService {
-    constructor(callModel, actionEventModel, vapiProvider, config) {
+    constructor(callModel, actionEventModel, vapiProvider, config, leadsService) {
         this.callModel = callModel;
         this.actionEventModel = actionEventModel;
         this.vapiProvider = vapiProvider;
         this.config = config;
+        this.leadsService = leadsService;
         this.logger = new common_1.Logger(CallsService_1.name);
         this.defaultPhoneNumber = this.config.get('VAPI_PHONE_NUMBER', '+918688664337');
     }
-    async startCall(phoneNumber, assistantId) {
+    async startCall(phoneNumber, assistantId, context) {
         const targetPhone = phoneNumber || '+918688664337';
         this.logger.log({ phoneNumber: targetPhone }, 'Starting outbound call');
         const callDoc = await this.callModel.create({
             phoneNumber: targetPhone,
             status: 'initiated',
             startTime: new Date(),
-            metadata: { assistantId: assistantId || this.config.get('VAPI_ASSISTANT_ID') },
+            metadata: {
+                assistantId: assistantId ||
+                    this.config.get('VAPI_ASSISTANT_ID'),
+                callbackId: context?.callbackId,
+                originalCallId: context?.originalCallId,
+                callbackContext: context
+                    ? {
+                        transcript: context.transcript,
+                        lead: context.lead,
+                    }
+                    : undefined,
+            },
         });
-        await this.recordAction(callDoc._id, 'CALL_STARTED', { phoneNumber: targetPhone });
+        const lead = await this.leadsService.createInitialLead({
+            callId: callDoc._id,
+            phoneNumber: targetPhone,
+            status: 'IN_PROGRESS',
+        });
+        callDoc.leadId = lead._id;
+        await callDoc.save();
+        await this.recordAction(callDoc._id, 'CALL_STARTED', {
+            phoneNumber: targetPhone,
+            callbackId: context?.callbackId,
+            originalCallId: context?.originalCallId,
+        });
         try {
             const vapiResult = await this.vapiProvider.startOutboundCall({
                 phoneNumber: targetPhone,
                 assistantId,
-                metadata: { internalCallId: callDoc._id.toString() },
+                metadata: {
+                    internalCallId: callDoc._id.toString(),
+                    leadId: lead._id.toString(),
+                    callId: callDoc._id.toString(),
+                    callbackId: context?.callbackId,
+                    originalCallId: context?.originalCallId,
+                    callbackContext: context
+                        ? JSON.stringify(context)
+                        : undefined,
+                },
             });
             callDoc.vapiCallId = vapiResult.vapiCallId;
             callDoc.status = vapiResult.status;
@@ -142,6 +175,7 @@ exports.CallsService = CallsService = CallsService_1 = __decorate([
     __metadata("design:paramtypes", [mongoose_2.Model,
         mongoose_2.Model,
         vapi_provider_1.VapiProvider,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        leads_service_1.LeadsService])
 ], CallsService);
 //# sourceMappingURL=calls.service.js.map

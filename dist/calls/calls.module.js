@@ -14,6 +14,7 @@ const action_event_schema_1 = require("../common/types/action-event.schema");
 const calls_controller_1 = require("./calls.controller");
 const calls_service_1 = require("./calls.service");
 const vapi_module_1 = require("../vapi/vapi.module");
+const leads_module_1 = require("../leads/leads.module");
 let CallsModule = class CallsModule {
 };
 exports.CallsModule = CallsModule;
@@ -25,6 +26,7 @@ exports.CallsModule = CallsModule = __decorate([
                 { name: action_event_schema_1.ActionEvent.name, schema: action_event_schema_1.ActionEventSchema },
             ]),
             vapi_module_1.VapiModule,
+            leads_module_1.LeadsModule,
         ],
         controllers: [calls_controller_1.CallsController],
         providers: [calls_service_1.CallsService],

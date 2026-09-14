@@ -57,34 +57,63 @@ export class SarvamProvider {
     }, { context: 'Sarvam.speechToText' });
   }
 
-  async textToSpeech(params: SarvamTtsParams): Promise<SarvamTtsResult> {
+  async textToSpeech(
+    params: SarvamTtsParams
+  ): Promise<SarvamTtsResult> {
     if (!this.apiKey) {
-      throw new Error('SARVAM_API_KEY not configured');
+      throw new Error("SARVAM_API_KEY not configured");
     }
-    return this.retryUtil.withRetry(async () => {
-      const body: Record<string, any> = {
-        text: params.text,
-        language: params.language,
-        voice: params.voice || 'default',
-        speed: params.speed || 1.0,
-      };
-      const response = await fetch(this.ttsUrl, {
-        method: 'POST',
-        headers: {
-          'api-subscription-key': this.apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Sarvam TTS failed: ${response.status} ${text}`);
+
+    return this.retryUtil.withRetry(
+      async () => {
+        const body = {
+          text: params.text,
+          target_language_code: params.language || 'hi-IN',
+          speaker: params.voice || 'ritu',
+          pace: params.speed ?? 0.95,
+          model: 'bulbul:v3',
+          speech_sample_rate: params.sampleRate || 16000,
+          output_audio_codec: 'wav',
+        };
+
+
+        const response = await fetch(
+          "https://api.sarvam.ai/text-to-speech",
+          {
+            method: "POST",
+            headers: {
+              "api-subscription-key": this.apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+
+          throw new Error(
+            `Sarvam TTS failed: ${response.status} ${errorText}`
+          );
+        }
+
+        const data = (await response.json()) as {
+          audios?: string[];
+        };
+
+        if (!data.audios?.[0]) {
+          throw new Error("Sarvam TTS returned no audio");
+        }
+
+        return {
+          audioBase64: data.audios[0],
+          format: "wav",
+        };
+      },
+      {
+        context: "Sarvam.textToSpeech",
       }
-      const data = await response.json() as any;
-      return {
-        audioBase64: data.audio_base64 || data.audio || '',
-        format: data.format || 'wav',
-      };
-    }, { context: 'Sarvam.textToSpeech' });
+    );
   }
+
 }

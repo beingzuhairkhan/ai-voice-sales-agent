@@ -43,6 +43,7 @@ export class WhatsAppService {
     });
 
     try {
+      console.log("Sending WhatsApp text message to:", phoneNumber, "Message:", message);
       const result = await this.provider.sendTextMessage(
         phoneNumber,
         message,

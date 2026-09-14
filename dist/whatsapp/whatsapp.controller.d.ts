@@ -6,4 +6,8 @@ export declare class WhatsAppController {
     whatsappWebhook(body: any): Promise<{
         success: boolean;
     }>;
+    testSendMessage(): Promise<{
+        success: boolean;
+        data: import("./whatsapp-message.schema").WhatsAppMessage;
+    }>;
 }

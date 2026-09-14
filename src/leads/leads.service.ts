@@ -145,4 +145,33 @@ export class LeadsService {
 
     return { leads, total, page, limit };
   }
+
+  async createInitialLead(params: {
+    callId: Types.ObjectId;
+    phoneNumber: string;
+    status: string;
+  }) {
+    return this.leadModel.create({
+      callId: params.callId,
+      phoneNumber: params.phoneNumber,
+
+      status: params.status,
+
+      // Unknown initially
+      budget: null,
+      products: null,
+      productCount: null,
+      timeline: null,
+      features: [],
+
+      temperature: null,
+      intentScore: null,
+      confidence: null,
+
+      hotWhatsappSent: false,
+
+      createdAt: new Date(),
+    });
+  }
+
 }

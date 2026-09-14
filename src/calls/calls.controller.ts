@@ -13,7 +13,11 @@ export class CallsController {
   @Post('start')
   @ApiOperation({ summary: 'Start an outbound call (defaults to +918688664337)' })
   async startCall(@Body() dto: StartCallDto) {
-    return this.callsService.startCall(dto.phoneNumber, dto.assistantId);
+    const assistandId = process.env.VAPI_ASSISTANT_ID;
+    if(!assistandId) {
+      throw new Error('VAPI_ASSISTANT_ID is not set in environment variables');
+    }
+    return this.callsService.startCall(dto.phoneNumber, assistandId);
   }
 
   @Get()

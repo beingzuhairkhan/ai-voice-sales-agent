@@ -25,9 +25,10 @@ import { JobsModule } from './jobs/jobs.module';
 import { FilesModule } from './files/files.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
-
+import { ScheduleModule } from '@nestjs/schedule';
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: ConfigValidation,

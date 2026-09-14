@@ -8,7 +8,11 @@ export declare class WhatsAppMetaProvider implements WhatsAppProvider {
     private readonly accessToken;
     private readonly phoneNumberId;
     private readonly apiUrl;
+    private readonly developerMobile;
+    private readonly resumeUrl;
+    private readonly systemOverviewUrl;
     constructor(config: ConfigService, retryUtil: RetryUtil);
+    private extractTemplateParams;
     sendTextMessage(to: string, body: string): Promise<WhatsAppSendResult>;
     sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult>;
     sendImage(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResult>;
