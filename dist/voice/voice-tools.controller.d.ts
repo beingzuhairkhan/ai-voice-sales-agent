@@ -5,12 +5,14 @@ import { Request } from 'express';
 import { SarvamProvider } from '@/sarvam/sarvam-provider';
 import type { Response } from 'express';
 import { FollowupService as FollowupGenerationService } from '../ai/followup-generation.service';
+import { LlmProvider } from '@/ai/llm-provider.interface';
 export declare class VoiceToolsController {
     private voiceToolsService;
     private sarvamTtsService;
     private config;
     private followupGen;
-    constructor(voiceToolsService: VoiceToolsService, sarvamTtsService: SarvamProvider, config: ConfigService, followupGen: FollowupGenerationService);
+    private llmProvider;
+    constructor(voiceToolsService: VoiceToolsService, sarvamTtsService: SarvamProvider, config: ConfigService, followupGen: FollowupGenerationService, llmProvider: LlmProvider);
     updateLead(dto: UpdateLeadDto): Promise<{
         success: boolean;
         leadId: string;

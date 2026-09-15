@@ -29,6 +29,7 @@ export class FollowupOrchestratorService {
     messageSent: boolean;
     error?: string;
   }> {
+    console.log('Processing completed call for follow-up. Call ID:', callId);
     const callObjectId = typeof callId === 'string' ? new Types.ObjectId(callId) : callId;
 
     this.logger.log({ callId: callObjectId.toString() }, 'Processing post-call follow-up');
@@ -95,6 +96,7 @@ export class FollowupOrchestratorService {
       const result = await this.whatsappService.sendFollowupWithAttachments(
         call.phoneNumber,
         followupMessage,
+        'POST_CALL_FOLLOWUP',
         { leadId: lead._id, triggerAction: 'POST_CALL_FOLLOWUP' },
       );
 

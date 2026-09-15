@@ -12,6 +12,9 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { FollowupService as FollowupGenerationService } from '../ai/followup-generation.service';
 import { ConfigService } from '@nestjs/config';
 import { VapiWebhookEvent } from '../vapi/vapi-provider.interface';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { FOLLOWUP_QUEUE } from '@/jobs/jobs.service';
 
 export interface WebhookProcessResult {
   status: 'processed' | 'duplicate' | 'ignored' | 'failed';
@@ -34,6 +37,8 @@ export class WebhooksService {
     private whatsappService: WhatsAppService,
     private followupGen: FollowupGenerationService,
     private config: ConfigService,
+    @InjectQueue(FOLLOWUP_QUEUE)
+  private readonly followupQueue: Queue,
   ) { }
 
   async handleVapiWebhook(payload: VapiWebhookEvent): Promise<WebhookProcessResult> {
@@ -287,13 +292,26 @@ export class WebhooksService {
 
       // HOT mid-call WhatsApp was already handled during the call if detected.
       // If it wasn't sent during the call (edge case), send it now.
-      if (qualification.temperature === 'HOT') {
-        const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(lead._id);
-        if (!alreadySent) {
-          this.logger.warn({ callId, leadId: lead._id.toString() }, 'HOT detected at end-of-call (not during call), sending WhatsApp now');
-          await this.sendHotWhatsApp(callId, lead._id, lead.phoneNumber, fullTranscript, extraction);
-        }
-      }
+      // if (qualification.temperature === 'HOT') {
+      //   const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(lead._id);
+      //   if (!alreadySent) {
+      //     this.logger.warn({ callId, leadId: lead._id.toString() }, 'HOT detected at end-of-call (not during call), sending WhatsApp now');
+      //     await this.sendHotWhatsApp(callId, lead._id, lead.phoneNumber, fullTranscript, extraction);
+      //   }
+      // }
+
+        const job =  await this.followupQueue.add(
+      'POST_CALL_FOLLOWUP',
+      {
+        callId,
+      },
+      {
+        jobId: `post-call-followup-${callId}`,
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
+    );
+    console.log("JOB" , job.id)
     } catch (err) {
       this.logger.error({ err: (err as Error).message, callId }, 'Post-call extraction/classification failed');
     }
@@ -301,77 +319,77 @@ export class WebhooksService {
     return { status: 'processed', callId };
   }
 
-  async sendHotWhatsApp(
-    callId: string,
-    leadId: Types.ObjectId | string,
-    phoneNumber: string,
-    transcript: string,
-    extraction: any,
-  ): Promise<void> {
-    // Idempotency check
-    const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(leadId);
-    if (alreadySent) {
-      this.logger.log({ leadId: leadId.toString() }, 'HOT WhatsApp already sent, skipping');
-      return;
-    }
+  // async sendHotWhatsApp(
+  //   callId: string,
+  //   leadId: Types.ObjectId | string,
+  //   phoneNumber: string,
+  //   transcript: string,
+  //   extraction: any,
+  // ): Promise<void> {
+  //   // Idempotency check
+  //   const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(leadId);
+  //   if (alreadySent) {
+  //     this.logger.log({ leadId: leadId.toString() }, 'HOT WhatsApp already sent, skipping');
+  //     return;
+  //   }
 
-    // Record HOT_DETECTED action
-    await this.actionEventModel.create({
-      type: 'HOT_DETECTED',
-      callId: new Types.ObjectId(callId),
-      leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
-      data: { trigger: 'hot-lead-detected' },
-      success: true,
-    });
+  //   // Record HOT_DETECTED action
+  //   await this.actionEventModel.create({
+  //     type: 'HOT_DETECTED',
+  //     callId: new Types.ObjectId(callId),
+  //     leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
+  //     data: { trigger: 'hot-lead-detected' },
+  //     success: true,
+  //   });
 
-    // Generate personalized message from actual conversation
-    const message = await this.followupGen.generateFollowup({
-      transcript,
-      extractedData: extraction,
-      temperature: 'HOT',
-    });
+  //   // Generate personalized message from actual conversation
+  //   const message = await this.followupGen.generateFollowup({
+  //     transcript,
+  //     extractedData: extraction,
+  //     temperature: 'HOT',
+  //   });
 
-    console.log("Generated HOT WhatsApp message:", message);
+  //   console.log("Generated HOT WhatsApp message:", message);
 
-    // Record WHATSAPP_TRIGGERED
-    await this.actionEventModel.create({
-      type: 'WHATSAPP_TRIGGERED',
-      callId: new Types.ObjectId(callId),
-      leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
-      data: { trigger: 'HOT_MID_CALL', messageLength: message.length },
-      success: true,
-    });
+  //   // Record WHATSAPP_TRIGGERED
+  //   await this.actionEventModel.create({
+  //     type: 'WHATSAPP_TRIGGERED',
+  //     callId: new Types.ObjectId(callId),
+  //     leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
+  //     data: { trigger: 'HOT_MID_CALL', messageLength: message.length },
+  //     success: true,
+  //   });
 
-    // Send immediately (NOT in background queue)
-    try {
-      await this.whatsappService.sendTextMessage(phoneNumber, message, {
-        leadId,
-        triggerAction: 'HOT_MID_CALL',
-      });
+  //   // Send immediately (NOT in background queue)
+  //   try {
+  //     await this.whatsappService.sendTextMessage(phoneNumber, message, {
+  //       leadId,
+  //       triggerAction: 'HOT_MID_CALL',
+  //     });
 
-      await this.leadsService.markHotWhatsappSent(leadId);
+  //     await this.leadsService.markHotWhatsappSent(leadId);
 
-      await this.actionEventModel.create({
-        type: 'WHATSAPP_SENT',
-        callId: new Types.ObjectId(callId),
-        leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
-        data: { trigger: 'HOT_MID_CALL' },
-        success: true,
-      });
+  //     await this.actionEventModel.create({
+  //       type: 'WHATSAPP_SENT',
+  //       callId: new Types.ObjectId(callId),
+  //       leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
+  //       data: { trigger: 'HOT_MID_CALL' },
+  //       success: true,
+  //     });
 
-      this.logger.log({ callId, leadId: leadId.toString() }, 'HOT mid-call WhatsApp sent successfully');
-    } catch (err) {
-      await this.actionEventModel.create({
-        type: 'WHATSAPP_FAILED',
-        callId: new Types.ObjectId(callId),
-        leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
-        data: { error: (err as Error).message, trigger: 'HOT_MID_CALL' },
-        success: false,
-      });
-      this.logger.error({ err: (err as Error).message }, 'HOT mid-call WhatsApp send failed');
-      throw err;
-    }
-  }
+  //     this.logger.log({ callId, leadId: leadId.toString() }, 'HOT mid-call WhatsApp sent successfully');
+  //   } catch (err) {
+  //     await this.actionEventModel.create({
+  //       type: 'WHATSAPP_FAILED',
+  //       callId: new Types.ObjectId(callId),
+  //       leadId: typeof leadId === 'string' ? new Types.ObjectId(leadId) : leadId,
+  //       data: { error: (err as Error).message, trigger: 'HOT_MID_CALL' },
+  //       success: false,
+  //     });
+  //     this.logger.error({ err: (err as Error).message }, 'HOT mid-call WhatsApp send failed');
+  //     throw err;
+  //   }
+  // }
 
   private extractEventId(payload: VapiWebhookEvent): string {
     // Vapi events may have an id at different levels

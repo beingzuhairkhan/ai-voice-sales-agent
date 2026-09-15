@@ -7,6 +7,10 @@ export interface WhatsAppSendResult {
 
 export interface WhatsAppProvider {
   sendTextMessage(to: string, body: string): Promise<WhatsAppSendResult>;
+  sendHotMidCall(
+    to: string,
+    summary: string,
+  ): Promise<WhatsAppSendResult>;
   sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult>;
   sendImage(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResult>;
 }

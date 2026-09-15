@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards, Headers, Req, Res, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Headers, Req, Res, BadRequestException, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { VoiceToolsService } from './voice-tools.service';
 import { UpdateLeadDto, SendWhatsappDto, BookCallbackDto, GetLeadContextDto, EndCallDto } from './dto/voice-tool.dto';
@@ -9,6 +9,9 @@ import { Request } from 'express';
 import { SarvamProvider } from '@/sarvam/sarvam-provider';
 import type { Response } from 'express';
 import { FollowupService as FollowupGenerationService } from '../ai/followup-generation.service';
+import { LLM_PROVIDER, LlmProvider } from '@/ai/llm-provider.interface';
+import { SUMMARIZE_PROMPT } from '@/ai/prompts/summarize.prompt';
+
 @ApiTags('Voice Tools')
 @Controller('voice/tools')
 @UseGuards(VoiceToolAuthGuard)
@@ -18,6 +21,8 @@ export class VoiceToolsController {
     private sarvamTtsService: SarvamProvider,
     private config: ConfigService,
       private followupGen: FollowupGenerationService,
+      @Inject(LLM_PROVIDER)
+          private llmProvider: LlmProvider,
   ) { }
 
   @Post('update-lead')
@@ -95,20 +100,24 @@ export class VoiceToolsController {
         'messageContent missing from Vapi tool arguments',
       );
     }
-    const msg = await this.followupGen.generateFollowup({
-      transcript:messageContent,
-      temperature: 'HOT',
-    });
+
+    console.log('SEND WHATSAPP: callId:', callId, 'leadId:', leadId, 'messageContent:', messageContent);
+
+    // const msg = await this.llmProvider.summarize(
+    //   messageContent,SUMMARIZE_PROMPT
+    // )
+
+    // console.log('SEND WHATSAPP: Generated summary:', msg);
 
 
     const result = await this.voiceToolsService.sendWhatsapp({
+      type: 'HOT_MID_CALL',
       callId,
       leadId,
       vapiCallId: body?.message?.call?.id,
-      msg,
+      messageContent,
     });
 
-    console.log('SEND WHATSAPP RESULT:', result);
 
     return result;
   }

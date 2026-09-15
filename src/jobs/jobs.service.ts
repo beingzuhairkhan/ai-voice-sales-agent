@@ -78,10 +78,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     // private readonly whatsappService: WhatsappService,
     private readonly callsService: CallsService,
   ) {
-    const redisUrl = this.config.get<string>(
-      'REDIS_URL',
-      'redis://localhost:6379',
-    );
+    // const redisUrl = this.config.get<string>(
+    //   'REDIS_URL',
+    //   'redis://localhost:6379',
+    // );
+    const redisUrl = 'rediss://default:gQAAAAAAAutcAAIgcDFhMWFhMjU1NDA0ZGE0YzE1OGJlYTA0ZjE5MzdjZjgyZg@cheerful-kitten-191324.upstash.io:6379'
 
     this.connection = new Redis(redisUrl, {
       maxRetriesPerRequest: null,
@@ -104,69 +105,95 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   // MODULE INIT
   // ============================================================
 
-  async onModuleInit(): Promise<void> {
-    this.startFollowupWorker();
-    this.startCallbackWorker();
+ async onModuleInit(): Promise<void> {
+  console.log('🔥 JobsService onModuleInit');
 
-    this.logger.log('JobsService initialized');
+  try {
+    await this.connection.ping();
+    console.log('🔥 Redis connected:', await this.connection.ping());
+  } catch (error) {
+    console.error('❌ Redis connection failed:', error);
   }
+
+  this.startFollowupWorker();
+  this.startCallbackWorker();
+
+  console.log('🔥 JobsService workers started');
+}
+
 
   // ============================================================
   // FOLLOW-UP WORKER
   // ============================================================
 
   private startFollowupWorker(): void {
-    this.followupWorker = new Worker(
-      FOLLOWUP_QUEUE,
-      async (job: Job) => {
-        const { callId } = job.data as {
-          callId: string;
-        };
+  console.log('🔥 Creating FOLLOWUP worker');
 
-        this.logger.log(
-          {
-            callId,
-            jobId: job.id,
-          },
-          'Processing post-call follow-up job',
+  this.followupWorker = new Worker(
+    FOLLOWUP_QUEUE,
+    async (job: Job) => {
+      console.log('🔥🔥🔥 FOLLOWUP JOB RECEIVED 🔥🔥🔥');
+      console.log('JOB ID:', job.id);
+      console.log('JOB NAME:', job.name);
+      console.log('JOB DATA:', job.data);
+
+      const { callId } = job.data as {
+        callId: string;
+      };
+
+      console.log(
+        '🔥 Calling processCompletedCall:',
+        callId,
+      );
+
+      const result =
+        await this.followupOrchestrator.processCompletedCall(
+          callId,
         );
 
-        await this.followupOrchestrator.processCompletedCall(callId);
-      },
-      {
-        connection: this.connection.duplicate(),
-        concurrency: 5,
-      },
-    );
-
-    this.followupWorker.on('completed', (job) => {
-      this.logger.log(
-        {
-          jobId: job.id,
-        },
-        'Follow-up job completed',
+      console.log(
+        '🔥 processCompletedCall result:',
+        result,
       );
-    });
 
-    this.followupWorker.on('failed', (job, error) => {
-      this.logger.error(
-        {
-          jobId: job?.id,
-          error: error.message,
-        },
-        'Follow-up job failed',
-      );
-    });
+      return result;
+    },
+    {
+      connection: this.connection.duplicate(),
+      concurrency: 5,
+    },
+  );
 
-    this.followupWorker.on('error', (error) => {
-      this.logger.error(
-        {
-          error: error.message,
-        },
-        'Follow-up worker error',
-      );
+  this.followupWorker.on('ready', () => {
+    console.log('✅ FOLLOWUP WORKER READY');
+  });
+
+  this.followupWorker.on('active', (job) => {
+    console.log('🚀 FOLLOWUP JOB ACTIVE:', job.id);
+  });
+
+  this.followupWorker.on('completed', (job, result) => {
+    console.log('✅ FOLLOWUP JOB COMPLETED:', {
+      jobId: job.id,
+      result,
     });
-  }
+  });
+
+  this.followupWorker.on('failed', (job, error) => {
+    console.error('❌ FOLLOWUP JOB FAILED:', {
+      jobId: job?.id,
+      error: error.message,
+      stack: error.stack,
+    });
+  });
+
+  this.followupWorker.on('error', (error) => {
+    console.error('❌ FOLLOWUP WORKER ERROR:', error);
+  });
+
+  console.log('🔥 FOLLOWUP WORKER CREATED');
+}
+
 
   // ============================================================
   // CALLBACK WORKER
@@ -229,33 +256,55 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   // ENQUEUE POST-CALL FOLLOW-UP
   // ============================================================
 
-  async enqueuePostCallFollowup(
-    callId: string | Types.ObjectId,
-  ): Promise<void> {
-    const callIdString = callId.toString();
+async enqueuePostCallFollowup(
+  callId: string | Types.ObjectId,
+): Promise<void> {
+  const callIdString = callId.toString();
 
-    await this.followupQueue.add(
-      'post-call-followup',
-      {
-        callId: callIdString,
-      },
-      {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: true,
-      },
-    );
+  console.log('🔥 BEFORE ADD');
 
-    this.logger.log(
-      {
-        callId: callIdString,
+  const job = await this.followupQueue.add(
+    'POST_CALL_FOLLOWUP',
+    {
+      callId: callIdString,
+    },
+    {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000,
       },
-      'Post-call follow-up job enqueued',
-    );
-  }
+      removeOnComplete: false,
+      removeOnFail: false,
+    },
+  );
+
+  console.log('🔥 FOLLOWUP JOB CREATED');
+  console.log('ID:', job.id);
+  console.log('NAME:', job.name);
+  console.log('DATA:', job.data);
+
+  const counts = await this.followupQueue.getJobCounts(
+    'waiting',
+    'active',
+    'completed',
+    'failed',
+    'delayed',
+    'paused',
+  );
+
+  console.log('🔥 QUEUE COUNTS:', counts);
+
+  const storedJob = await this.followupQueue.getJob(job.id!);
+
+  console.log('🔥 STORED JOB:', {
+    id: storedJob?.id,
+    name: storedJob?.name,
+    data: storedJob?.data,
+    state: await storedJob?.getState(),
+  });
+}
+
 
   // ============================================================
   // WHATSAPP RETRY

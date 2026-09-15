@@ -14,7 +14,9 @@ export declare class UpdateLeadDto {
     buyingSignals?: string[];
     language?: string;
 }
+type WhatsappTriggerType = 'HOT_MID_CALL' | 'POST_CALL_FOLLOWUP';
 export declare class SendWhatsappDto {
+    type: WhatsappTriggerType;
     callId: string;
     messageContent: string;
 }
@@ -30,3 +32,4 @@ export declare class EndCallDto {
     callId: string;
     summary?: string;
 }
+export {};

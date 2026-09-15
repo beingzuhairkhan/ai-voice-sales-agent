@@ -22,12 +22,14 @@ const public_decorator_1 = require("../common/decorators/public.decorator");
 const config_1 = require("@nestjs/config");
 const sarvam_provider_1 = require("../sarvam/sarvam-provider");
 const followup_generation_service_1 = require("../ai/followup-generation.service");
+const llm_provider_interface_1 = require("../ai/llm-provider.interface");
 let VoiceToolsController = class VoiceToolsController {
-    constructor(voiceToolsService, sarvamTtsService, config, followupGen) {
+    constructor(voiceToolsService, sarvamTtsService, config, followupGen, llmProvider) {
         this.voiceToolsService = voiceToolsService;
         this.sarvamTtsService = sarvamTtsService;
         this.config = config;
         this.followupGen = followupGen;
+        this.llmProvider = llmProvider;
     }
     async updateLead(dto) {
         return this.voiceToolsService.updateLead(dto);
@@ -69,17 +71,14 @@ let VoiceToolsController = class VoiceToolsController {
         if (!messageContent) {
             throw new common_1.BadRequestException('messageContent missing from Vapi tool arguments');
         }
-        const msg = await this.followupGen.generateFollowup({
-            transcript: messageContent,
-            temperature: 'HOT',
-        });
+        console.log('SEND WHATSAPP: callId:', callId, 'leadId:', leadId, 'messageContent:', messageContent);
         const result = await this.voiceToolsService.sendWhatsapp({
+            type: 'HOT_MID_CALL',
             callId,
             leadId,
             vapiCallId: body?.message?.call?.id,
-            msg,
+            messageContent,
         });
-        console.log('SEND WHATSAPP RESULT:', result);
         return result;
     }
     async bookCallback(body, headers, req) {
@@ -212,9 +211,10 @@ exports.VoiceToolsController = VoiceToolsController = __decorate([
     (0, common_1.Controller)('voice/tools'),
     (0, common_1.UseGuards)(voice_tool_auth_guard_1.VoiceToolAuthGuard),
     (0, public_decorator_1.Public)(),
+    __param(4, (0, common_1.Inject)(llm_provider_interface_1.LLM_PROVIDER)),
     __metadata("design:paramtypes", [voice_tools_service_1.VoiceToolsService,
         sarvam_provider_1.SarvamProvider,
         config_1.ConfigService,
-        followup_generation_service_1.FollowupService])
+        followup_generation_service_1.FollowupService, Object])
 ], VoiceToolsController);
 //# sourceMappingURL=voice-tools.controller.js.map

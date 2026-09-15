@@ -124,6 +124,42 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
             context: 'WhatsApp.sendText',
         });
     }
+    async sendHotMidCall(to, summary) {
+        console.log("Sending WhatsApp hot mid-call message to:", to, "with summary:", summary);
+        return this.retryUtil.withRetry(async () => {
+            const response = await fetch(`${this.apiUrl}/${this.phoneNumberId}/messages`, {
+                method: 'POST',
+                headers: this.headers(),
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: this.normalizeNumber(to),
+                    type: 'template',
+                    template: {
+                        name: 'hot_mid_call',
+                        language: {
+                            code: 'en',
+                        },
+                        components: [
+                            {
+                                type: 'body',
+                                parameters: [
+                                    {
+                                        type: 'text',
+                                        text: summary,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                }),
+            });
+            return this.parseResponse(response);
+        }, {
+            maxRetries: 2,
+            context: 'WhatsApp.sendHotMidCall',
+        });
+    }
     async sendDocument(to, documentUrl, caption) {
         return this.retryUtil.withRetry(async () => {
             const payload = {

@@ -13,7 +13,7 @@ export declare class WhatsAppService {
     sendTextMessage(phoneNumber: string, message: string, options?: {
         leadId?: Types.ObjectId | string;
         triggerAction?: string;
-    }): Promise<WhatsAppMessage>;
+    }, templateType?: 'HOT_MID_CALL' | 'POST_CALL_FOLLOWUP'): Promise<WhatsAppMessage>;
     sendDocument(phoneNumber: string, documentUrl: string, caption?: string, options?: {
         leadId?: Types.ObjectId | string;
         triggerAction?: string;
@@ -22,7 +22,7 @@ export declare class WhatsAppService {
         leadId?: Types.ObjectId | string;
         triggerAction?: string;
     }): Promise<WhatsAppMessage>;
-    sendFollowupWithAttachments(phoneNumber: string, message: string, options?: {
+    sendFollowupWithAttachments(phoneNumber: string, message: string, templateType: 'POST_CALL_FOLLOWUP', options?: {
         leadId?: Types.ObjectId | string;
         triggerAction?: string;
     }): Promise<{

@@ -44,7 +44,7 @@ let JobsService = JobsService_1 = class JobsService {
         this.conversationsService = conversationsService;
         this.callsService = callsService;
         this.logger = new common_1.Logger(JobsService_1.name);
-        const redisUrl = this.config.get('REDIS_URL', 'redis://localhost:6379');
+        const redisUrl = 'rediss://default:gQAAAAAAAutcAAIgcDFhMWFhMjU1NDA0ZGE0YzE1OGJlYTA0ZjE5MzdjZjgyZg@cheerful-kitten-191324.upstash.io:6379';
         this.connection = new ioredis_1.default(redisUrl, {
             maxRetriesPerRequest: null,
         });
@@ -59,38 +59,57 @@ let JobsService = JobsService_1 = class JobsService {
         });
     }
     async onModuleInit() {
+        console.log('🔥 JobsService onModuleInit');
+        try {
+            await this.connection.ping();
+            console.log('🔥 Redis connected:', await this.connection.ping());
+        }
+        catch (error) {
+            console.error('❌ Redis connection failed:', error);
+        }
         this.startFollowupWorker();
         this.startCallbackWorker();
-        this.logger.log('JobsService initialized');
+        console.log('🔥 JobsService workers started');
     }
     startFollowupWorker() {
+        console.log('🔥 Creating FOLLOWUP worker');
         this.followupWorker = new bullmq_1.Worker(exports.FOLLOWUP_QUEUE, async (job) => {
+            console.log('🔥🔥🔥 FOLLOWUP JOB RECEIVED 🔥🔥🔥');
+            console.log('JOB ID:', job.id);
+            console.log('JOB NAME:', job.name);
+            console.log('JOB DATA:', job.data);
             const { callId } = job.data;
-            this.logger.log({
-                callId,
-                jobId: job.id,
-            }, 'Processing post-call follow-up job');
-            await this.followupOrchestrator.processCompletedCall(callId);
+            console.log('🔥 Calling processCompletedCall:', callId);
+            const result = await this.followupOrchestrator.processCompletedCall(callId);
+            console.log('🔥 processCompletedCall result:', result);
+            return result;
         }, {
             connection: this.connection.duplicate(),
             concurrency: 5,
         });
-        this.followupWorker.on('completed', (job) => {
-            this.logger.log({
+        this.followupWorker.on('ready', () => {
+            console.log('✅ FOLLOWUP WORKER READY');
+        });
+        this.followupWorker.on('active', (job) => {
+            console.log('🚀 FOLLOWUP JOB ACTIVE:', job.id);
+        });
+        this.followupWorker.on('completed', (job, result) => {
+            console.log('✅ FOLLOWUP JOB COMPLETED:', {
                 jobId: job.id,
-            }, 'Follow-up job completed');
+                result,
+            });
         });
         this.followupWorker.on('failed', (job, error) => {
-            this.logger.error({
+            console.error('❌ FOLLOWUP JOB FAILED:', {
                 jobId: job?.id,
                 error: error.message,
-            }, 'Follow-up job failed');
+                stack: error.stack,
+            });
         });
         this.followupWorker.on('error', (error) => {
-            this.logger.error({
-                error: error.message,
-            }, 'Follow-up worker error');
+            console.error('❌ FOLLOWUP WORKER ERROR:', error);
         });
+        console.log('🔥 FOLLOWUP WORKER CREATED');
     }
     startCallbackWorker() {
         this.callbackWorker = new bullmq_1.Worker(exports.CALLBACK_QUEUE, async (job) => {
@@ -123,7 +142,8 @@ let JobsService = JobsService_1 = class JobsService {
     }
     async enqueuePostCallFollowup(callId) {
         const callIdString = callId.toString();
-        await this.followupQueue.add('post-call-followup', {
+        console.log('🔥 BEFORE ADD');
+        const job = await this.followupQueue.add('POST_CALL_FOLLOWUP', {
             callId: callIdString,
         }, {
             attempts: 3,
@@ -131,11 +151,22 @@ let JobsService = JobsService_1 = class JobsService {
                 type: 'exponential',
                 delay: 5000,
             },
-            removeOnComplete: true,
+            removeOnComplete: false,
+            removeOnFail: false,
         });
-        this.logger.log({
-            callId: callIdString,
-        }, 'Post-call follow-up job enqueued');
+        console.log('🔥 FOLLOWUP JOB CREATED');
+        console.log('ID:', job.id);
+        console.log('NAME:', job.name);
+        console.log('DATA:', job.data);
+        const counts = await this.followupQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed', 'paused');
+        console.log('🔥 QUEUE COUNTS:', counts);
+        const storedJob = await this.followupQueue.getJob(job.id);
+        console.log('🔥 STORED JOB:', {
+            id: storedJob?.id,
+            name: storedJob?.name,
+            data: storedJob?.data,
+            state: await storedJob?.getState(),
+        });
     }
     async enqueueWhatsappRetry(messageId, phoneNumber, message) {
         await this.whatsappRetryQueue.add('whatsapp-retry', {

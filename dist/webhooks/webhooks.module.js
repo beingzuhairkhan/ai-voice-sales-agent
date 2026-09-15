@@ -19,12 +19,17 @@ const leads_module_1 = require("../leads/leads.module");
 const ai_module_1 = require("../ai/ai.module");
 const qualification_module_1 = require("../qualification/qualification.module");
 const whatsapp_module_1 = require("../whatsapp/whatsapp.module");
+const jobs_service_1 = require("../jobs/jobs.service");
+const bullmq_1 = require("@nestjs/bullmq");
 let WebhooksModule = class WebhooksModule {
 };
 exports.WebhooksModule = WebhooksModule;
 exports.WebhooksModule = WebhooksModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            bullmq_1.BullModule.registerQueue({
+                name: jobs_service_1.FOLLOWUP_QUEUE,
+            }),
             mongoose_1.MongooseModule.forFeature([
                 { name: webhook_event_schema_1.WebhookEvent.name, schema: webhook_event_schema_1.WebhookEventSchema },
                 { name: action_event_schema_1.ActionEvent.name, schema: action_event_schema_1.ActionEventSchema },

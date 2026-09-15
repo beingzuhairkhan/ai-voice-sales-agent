@@ -10,6 +10,7 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { FollowupService as FollowupGenerationService } from '../ai/followup-generation.service';
 import { ConfigService } from '@nestjs/config';
 import { VapiWebhookEvent } from '../vapi/vapi-provider.interface';
+import { Queue } from 'bullmq';
 export interface WebhookProcessResult {
     status: 'processed' | 'duplicate' | 'ignored' | 'failed';
     callId?: string;
@@ -26,8 +27,9 @@ export declare class WebhooksService {
     private whatsappService;
     private followupGen;
     private config;
+    private readonly followupQueue;
     private readonly logger;
-    constructor(webhookEventModel: Model<WebhookEvent>, actionEventModel: Model<ActionEvent>, callsService: CallsService, conversationsService: ConversationsService, leadsService: LeadsService, extractionService: LeadExtractionService, qualificationService: QualificationService, whatsappService: WhatsAppService, followupGen: FollowupGenerationService, config: ConfigService);
+    constructor(webhookEventModel: Model<WebhookEvent>, actionEventModel: Model<ActionEvent>, callsService: CallsService, conversationsService: ConversationsService, leadsService: LeadsService, extractionService: LeadExtractionService, qualificationService: QualificationService, whatsappService: WhatsAppService, followupGen: FollowupGenerationService, config: ConfigService, followupQueue: Queue);
     handleVapiWebhook(payload: VapiWebhookEvent): Promise<WebhookProcessResult>;
     private processEvent;
     private handleStatusUpdate;
@@ -35,7 +37,6 @@ export declare class WebhooksService {
     private handleToolCall;
     debugHandleEndOfCall(callId: string): Promise<WebhookProcessResult>;
     private handleEndOfCall;
-    sendHotWhatsApp(callId: string, leadId: Types.ObjectId | string, phoneNumber: string, transcript: string, extraction: any): Promise<void>;
     private extractEventId;
     private mapVapiStatus;
     listEvents(params: {

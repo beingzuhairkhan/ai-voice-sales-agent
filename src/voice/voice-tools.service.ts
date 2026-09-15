@@ -88,54 +88,33 @@ export class VoiceToolsService {
   async sendWhatsapp(
     dto: any,
   ): Promise<{ success: boolean; message: string; messageId?: string }> {
-    console.log('========== SEND WHATSAPP START ==========');
-    console.log('DTO:', dto);
-
     try {
-      console.log('Validating active call...');
       const call = await this.validateActiveCall(dto.callId);
-      console.log('ACTIVE CALL:', call);
 
       if (!call) {
         throw new BadRequestException(
           `No call found for Vapi call ID: ${dto.callId}`,
         );
       }
-      console.log('Finding lead for callId:', dto.callId);
+
       const lead = await this.leadsService.getLeadByCallId(call._id);
-      console.log('FOUND LEAD:', lead);
 
       if (!lead) {
-        console.log('❌ NO LEAD FOUND for callId:', call._id);
-
         throw new BadRequestException(
           'No lead found for this call — call update_lead first',
         );
       }
 
-      console.log('Lead ID:', lead._id);
-      console.log('Phone Number:', call.phoneNumber);
-      console.log('Message Content:', dto.messageContent);
-
-      // Idempotency: prevent duplicate HOT WhatsApp
-      console.log('Checking if HOT WhatsApp was already sent...');
-
-      const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(
-        lead._id,
-      );
-
-      console.log('Already sent:', alreadySent);
+      // Check only HOT_MID_CALL WhatsApp
+      const alreadySent =
+        await this.leadsService.hasHotWhatsappBeenSent(lead._id);
 
       if (alreadySent) {
-        console.log('⚠️ WhatsApp already sent. Skipping duplicate send.');
-
         return {
           success: true,
-          message: 'WhatsApp already sent for this lead. Not sending again.',
+          message: 'Hot mid-call WhatsApp already sent. Skipping duplicate.',
         };
       }
-
-      console.log('Creating WHATSAPP_TRIGGERED action event...');
 
       await this.actionEventModel.create({
         type: 'WHATSAPP_TRIGGERED',
@@ -143,34 +122,27 @@ export class VoiceToolsService {
         leadId: lead._id,
         data: {
           trigger: 'VOICE_TOOL',
+          whatsappType: 'HOT_MID_CALL',
           messageLength: dto.messageContent.length,
         },
         success: true,
       });
 
-      console.log('WHATSAPP_TRIGGERED event created.');
-
       try {
-        console.log('Sending WhatsApp message...');
-        console.log('To:', call.phoneNumber);
-        console.log('Message:', dto.messageContent);
+        // Send HOT_MID_CALL template
+        const whatsappMsg =
+          await this.whatsappService.sendTextMessage(
+            call.phoneNumber,
+            dto.messageContent,
+            {
+              leadId: lead._id,
+              triggerAction: 'HOT_MID_CALL',
+            },
+            'HOT_MID_CALL',
+          );
 
-        const whatsappMsg = await this.whatsappService.sendTextMessage(
-          call.phoneNumber,
-          dto.messageContent,
-          {
-            leadId: lead._id,
-            triggerAction: 'HOT_MID_CALL',
-          },
-        );
-
-        console.log('✅ WhatsApp API response:', whatsappMsg);
-
-        console.log('Marking HOT WhatsApp as sent...');
+        // Mark only HOT_MID_CALL as sent
         await this.leadsService.markHotWhatsappSent(lead._id);
-        console.log('HOT WhatsApp marked as sent.');
-
-        console.log('Creating WHATSAPP_SENT action event...');
 
         await this.actionEventModel.create({
           type: 'WHATSAPP_SENT',
@@ -178,53 +150,40 @@ export class VoiceToolsService {
           leadId: lead._id,
           data: {
             trigger: 'VOICE_TOOL',
+            whatsappType: 'HOT_MID_CALL',
             messageId: whatsappMsg._id?.toString(),
           },
           success: true,
         });
 
-        console.log('WHATSAPP_SENT event created.');
-
-        const messageId = whatsappMsg._id?.toString();
-
-        console.log('✅ WhatsApp message sent successfully.');
-        console.log('Message ID:', messageId);
-        console.log('========== SEND WHATSAPP END ==========');
-
         return {
           success: true,
-          message: 'WhatsApp message sent successfully during the call.',
-          messageId,
+          message: 'Hot mid-call WhatsApp sent successfully.',
+          messageId: whatsappMsg._id?.toString(),
         };
       } catch (err) {
-        console.error('❌ WhatsApp send failed:', err);
-
         await this.actionEventModel.create({
           type: 'WHATSAPP_FAILED',
           callId: call._id,
           leadId: lead._id,
           data: {
-            error: (err as Error).message,
+            error: err instanceof Error ? err.message : String(err),
             trigger: 'VOICE_TOOL',
+            whatsappType: 'HOT_MID_CALL',
           },
           success: false,
         });
 
-        console.log('WHATSAPP_FAILED event created.');
-        console.log('========== SEND WHATSAPP END (FAILED) ==========');
-
         return {
           success: false,
-          message: `WhatsApp send failed: ${(err as Error).message}`,
+          message: `WhatsApp send failed: ${err instanceof Error ? err.message : String(err)
+            }`,
         };
       }
     } catch (err) {
-      console.error('❌ SEND WHATSAPP ERROR:', err);
-      console.log('========== SEND WHATSAPP END (ERROR) ==========');
       throw err;
     }
   }
-
 
   async bookCallback(dto: any): Promise<{
     success: boolean;

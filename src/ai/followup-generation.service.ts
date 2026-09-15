@@ -26,10 +26,10 @@ export class FollowupService {
   }
 
   private readonly resumeUrl =
-  "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
+    "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
 
-private readonly systemOverviewUrl =
-  "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
+  private readonly systemOverviewUrl =
+    "https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view";
 
 
   async generateFollowup(params: FollowupGenerationParams): Promise<string> {
@@ -81,7 +81,7 @@ Return ONLY valid JSON.
       );
 
       if (!message || message.trim().length === 0) {
-        return this.fallbackMessage(extractedData );
+        return this.fallbackMessage(extractedData);
       }
 
       // Ensure developer contact info is present
@@ -99,32 +99,32 @@ Return ONLY valid JSON.
     }
   }
 
-private fallbackMessage(extractedData?: ExtractedLeadData): string {
-  const data = extractedData || ({} as ExtractedLeadData);
+  private fallbackMessage(extractedData?: ExtractedLeadData): string {
+    const data = extractedData || ({} as ExtractedLeadData);
 
-  const businessName = data.name || data.productDescription || "your business";
-  const productCount = data.productCount || "the required";
-  const budget = data.budget || "to be discussed";
-  const timeline = data.timeline || "to be discussed";
-  
-  const rawFeatures = data.requiredFeatures as any;
-  const requiredFeatures = (rawFeatures && typeof rawFeatures === 'string' && rawFeatures.trim().length > 0)
-    ? rawFeatures
-    : (Array.isArray(rawFeatures) && rawFeatures.length > 0)
-      ? rawFeatures.join(', ')
-      : "the required features";
+    const businessName = data.name || data.productDescription || "your business";
+    const productCount = data.productCount || "the required";
+    const budget = data.budget || "to be discussed";
+    const timeline = data.timeline || "to be discussed";
 
-  // Returns valid JSON matching the 8 template variables required by your prompt
-  console.log('Fallback follow-up message:') ;
-  return JSON.stringify({
-    businessName,
-    productCount,
-    budget,
-    timeline,
-    requiredFeatures,
-    developerMobile: this.developerMobile,
-    resumeUrl: this.resumeUrl,
-    systemOverviewUrl: this.systemOverviewUrl,
-  }, null, 2);
-}
+    const rawFeatures = data.requiredFeatures as any;
+    const requiredFeatures = (rawFeatures && typeof rawFeatures === 'string' && rawFeatures.trim().length > 0)
+      ? rawFeatures
+      : (Array.isArray(rawFeatures) && rawFeatures.length > 0)
+        ? rawFeatures.join(', ')
+        : "the required features";
+
+    // Returns valid JSON matching the 8 template variables required by your prompt
+    console.log('Fallback follow-up message:');
+    return JSON.stringify({
+      businessName,
+      productCount,
+      budget,
+      timeline,
+      requiredFeatures,
+      developerMobile: this.developerMobile,
+      resumeUrl: this.resumeUrl,
+      systemOverviewUrl: this.systemOverviewUrl,
+    }, null, 2);
+  }
 }

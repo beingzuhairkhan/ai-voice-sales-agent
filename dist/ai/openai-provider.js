@@ -65,6 +65,7 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
         }
     }
     async summarize(transcript, systemPrompt) {
+        console.log("transcript", transcript);
         return this.chatCompletion([
             {
                 role: 'system',

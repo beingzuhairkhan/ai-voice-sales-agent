@@ -10,9 +10,14 @@ import { LeadsModule } from '../leads/leads.module';
 import { AiModule } from '../ai/ai.module';
 import { QualificationModule } from '../qualification/qualification.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
+import { FOLLOWUP_QUEUE } from '@/jobs/jobs.service';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
+    BullModule.registerQueue({
+      name: FOLLOWUP_QUEUE,
+    }),
     MongooseModule.forFeature([
       { name: WebhookEvent.name, schema: WebhookEventSchema },
       { name: ActionEvent.name, schema: ActionEventSchema },
@@ -23,6 +28,7 @@ import { WhatsAppModule } from '../whatsapp/whatsapp.module';
     AiModule,
     QualificationModule,
     WhatsAppModule,
+    
   ],
   controllers: [WebhooksController],
   providers: [WebhooksService],

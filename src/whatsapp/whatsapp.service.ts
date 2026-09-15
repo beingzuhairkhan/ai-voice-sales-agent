@@ -17,8 +17,10 @@ export class WhatsAppService {
     @Inject(WHATSAPP_PROVIDER) private provider: WhatsAppProvider,
     private config: ConfigService,
   ) {
-    this.resumeUrl = this.config.get<string>('RESUME_URL', '');
-    this.architectureImageUrl = this.config.get<string>('ARCHITECTURE_IMAGE_URL', '');
+    // this.resumeUrl = this.config.get<string>('RESUME_URL', '');
+    // this.architectureImageUrl = this.config.get<string>('ARCHITECTURE_IMAGE_URL', '');
+    this.resumeUrl = 'https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view';
+    this.architectureImageUrl = 'https://drive.google.com/file/d/1rEZr_JxMN_yIG9MDYelJKn_hO9XWkYIl/view';
   }
 
   async sendTextMessage(
@@ -28,6 +30,7 @@ export class WhatsAppService {
       leadId?: Types.ObjectId | string;
       triggerAction?: string;
     },
+    templateType?: 'HOT_MID_CALL' | 'POST_CALL_FOLLOWUP',
   ): Promise<WhatsAppMessage> {
     const record = await this.messageModel.create({
       phoneNumber,
@@ -43,19 +46,23 @@ export class WhatsAppService {
     });
 
     try {
-      console.log("Sending WhatsApp text message to:", phoneNumber, "Message:", message);
-      const result = await this.provider.sendTextMessage(
-        phoneNumber,
-        message,
-      );
+      let result: any;
 
-      record.providerMessageId =
-        result.providerMessageId;
+      if (templateType === 'HOT_MID_CALL') {
+        result = await this.provider.sendHotMidCall(
+          phoneNumber,
+          message,
+        );
+      } else {
+        result = await this.provider.sendTextMessage(
+          phoneNumber,
+          message,
+        );
+      }
 
+      record.providerMessageId = result.providerMessageId;
       record.status = 'pending';
-
-      record.deliveryInfo =
-        result.rawResponse || {};
+      record.deliveryInfo = result.rawResponse || {};
 
       return record.save();
     } catch (err) {
@@ -77,6 +84,7 @@ export class WhatsAppService {
         {
           err: errorMsg,
           phoneNumber,
+          templateType,
         },
         'WhatsApp template send failed',
       );
@@ -156,9 +164,10 @@ export class WhatsAppService {
   async sendFollowupWithAttachments(
     phoneNumber: string,
     message: string,
+    templateType: 'POST_CALL_FOLLOWUP',
     options?: { leadId?: Types.ObjectId | string; triggerAction?: string },
   ): Promise<{ textMessage: WhatsAppMessage; attachments: WhatsAppMessage[] }> {
-    const textMessage = await this.sendTextMessage(phoneNumber, message, options);
+    const textMessage = await this.sendTextMessage(phoneNumber, message, options, templateType);
     const attachments: WhatsAppMessage[] = [];
 
     // Send resume if configured

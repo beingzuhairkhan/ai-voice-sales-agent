@@ -14,6 +14,7 @@ export declare class WhatsAppMetaProvider implements WhatsAppProvider {
     constructor(config: ConfigService, retryUtil: RetryUtil);
     private extractTemplateParams;
     sendTextMessage(to: string, body: string): Promise<WhatsAppSendResult>;
+    sendHotMidCall(to: string, summary: string): Promise<WhatsAppSendResult>;
     sendDocument(to: string, documentUrl: string, caption?: string): Promise<WhatsAppSendResult>;
     sendImage(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResult>;
     private headers;

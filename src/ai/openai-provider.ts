@@ -306,6 +306,7 @@ export class OpenAiProvider implements LlmProvider {
     transcript: string,
     systemPrompt: string,
   ): Promise<string> {
+    console.log("transcript",transcript)
     return this.chatCompletion(
       [
         {

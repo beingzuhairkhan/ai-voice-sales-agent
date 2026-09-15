@@ -27,8 +27,11 @@ const qualification_service_1 = require("../qualification/qualification.service"
 const whatsapp_service_1 = require("../whatsapp/whatsapp.service");
 const followup_generation_service_1 = require("../ai/followup-generation.service");
 const config_1 = require("@nestjs/config");
+const bullmq_1 = require("@nestjs/bullmq");
+const bullmq_2 = require("bullmq");
+const jobs_service_1 = require("../jobs/jobs.service");
 let WebhooksService = WebhooksService_1 = class WebhooksService {
-    constructor(webhookEventModel, actionEventModel, callsService, conversationsService, leadsService, extractionService, qualificationService, whatsappService, followupGen, config) {
+    constructor(webhookEventModel, actionEventModel, callsService, conversationsService, leadsService, extractionService, qualificationService, whatsappService, followupGen, config, followupQueue) {
         this.webhookEventModel = webhookEventModel;
         this.actionEventModel = actionEventModel;
         this.callsService = callsService;
@@ -39,6 +42,7 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
         this.whatsappService = whatsappService;
         this.followupGen = followupGen;
         this.config = config;
+        this.followupQueue = followupQueue;
         this.logger = new common_1.Logger(WebhooksService_1.name);
     }
     async handleVapiWebhook(payload) {
@@ -210,71 +214,19 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
                 success: true,
             });
             await this.callsService.updateCallStatus(callId, 'ended', { leadId: lead._id });
-            if (qualification.temperature === 'HOT') {
-                const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(lead._id);
-                if (!alreadySent) {
-                    this.logger.warn({ callId, leadId: lead._id.toString() }, 'HOT detected at end-of-call (not during call), sending WhatsApp now');
-                    await this.sendHotWhatsApp(callId, lead._id, lead.phoneNumber, fullTranscript, extraction);
-                }
-            }
+            const job = await this.followupQueue.add('POST_CALL_FOLLOWUP', {
+                callId,
+            }, {
+                jobId: `post-call-followup-${callId}`,
+                removeOnComplete: true,
+                removeOnFail: false,
+            });
+            console.log("JOB", job.id);
         }
         catch (err) {
             this.logger.error({ err: err.message, callId }, 'Post-call extraction/classification failed');
         }
         return { status: 'processed', callId };
-    }
-    async sendHotWhatsApp(callId, leadId, phoneNumber, transcript, extraction) {
-        const alreadySent = await this.leadsService.hasHotWhatsappBeenSent(leadId);
-        if (alreadySent) {
-            this.logger.log({ leadId: leadId.toString() }, 'HOT WhatsApp already sent, skipping');
-            return;
-        }
-        await this.actionEventModel.create({
-            type: 'HOT_DETECTED',
-            callId: new mongoose_2.Types.ObjectId(callId),
-            leadId: typeof leadId === 'string' ? new mongoose_2.Types.ObjectId(leadId) : leadId,
-            data: { trigger: 'hot-lead-detected' },
-            success: true,
-        });
-        const message = await this.followupGen.generateFollowup({
-            transcript,
-            extractedData: extraction,
-            temperature: 'HOT',
-        });
-        console.log("Generated HOT WhatsApp message:", message);
-        await this.actionEventModel.create({
-            type: 'WHATSAPP_TRIGGERED',
-            callId: new mongoose_2.Types.ObjectId(callId),
-            leadId: typeof leadId === 'string' ? new mongoose_2.Types.ObjectId(leadId) : leadId,
-            data: { trigger: 'HOT_MID_CALL', messageLength: message.length },
-            success: true,
-        });
-        try {
-            await this.whatsappService.sendTextMessage(phoneNumber, message, {
-                leadId,
-                triggerAction: 'HOT_MID_CALL',
-            });
-            await this.leadsService.markHotWhatsappSent(leadId);
-            await this.actionEventModel.create({
-                type: 'WHATSAPP_SENT',
-                callId: new mongoose_2.Types.ObjectId(callId),
-                leadId: typeof leadId === 'string' ? new mongoose_2.Types.ObjectId(leadId) : leadId,
-                data: { trigger: 'HOT_MID_CALL' },
-                success: true,
-            });
-            this.logger.log({ callId, leadId: leadId.toString() }, 'HOT mid-call WhatsApp sent successfully');
-        }
-        catch (err) {
-            await this.actionEventModel.create({
-                type: 'WHATSAPP_FAILED',
-                callId: new mongoose_2.Types.ObjectId(callId),
-                leadId: typeof leadId === 'string' ? new mongoose_2.Types.ObjectId(leadId) : leadId,
-                data: { error: err.message, trigger: 'HOT_MID_CALL' },
-                success: false,
-            });
-            this.logger.error({ err: err.message }, 'HOT mid-call WhatsApp send failed');
-            throw err;
-        }
     }
     extractEventId(payload) {
         const anyPayload = payload;
@@ -338,6 +290,7 @@ exports.WebhooksService = WebhooksService = WebhooksService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(webhook_event_schema_1.WebhookEvent.name)),
     __param(1, (0, mongoose_1.InjectModel)(action_event_schema_1.ActionEvent.name)),
+    __param(10, (0, bullmq_1.InjectQueue)(jobs_service_1.FOLLOWUP_QUEUE)),
     __metadata("design:paramtypes", [mongoose_2.Model,
         mongoose_2.Model,
         calls_service_1.CallsService,
@@ -347,6 +300,7 @@ exports.WebhooksService = WebhooksService = WebhooksService_1 = __decorate([
         qualification_service_1.QualificationService,
         whatsapp_service_1.WhatsAppService,
         followup_generation_service_1.FollowupService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        bullmq_2.Queue])
 ], WebhooksService);
 //# sourceMappingURL=webhooks.service.js.map

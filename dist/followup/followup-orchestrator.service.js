@@ -36,6 +36,7 @@ let FollowupOrchestratorService = FollowupOrchestratorService_1 = class Followup
         this.logger = new common_1.Logger(FollowupOrchestratorService_1.name);
     }
     async processCompletedCall(callId) {
+        console.log('Processing completed call for follow-up. Call ID:', callId);
         const callObjectId = typeof callId === 'string' ? new mongoose_2.Types.ObjectId(callId) : callId;
         this.logger.log({ callId: callObjectId.toString() }, 'Processing post-call follow-up');
         const call = await this.callModel.findById(callObjectId).exec();
@@ -86,7 +87,7 @@ let FollowupOrchestratorService = FollowupOrchestratorService_1 = class Followup
             success: true,
         });
         try {
-            const result = await this.whatsappService.sendFollowupWithAttachments(call.phoneNumber, followupMessage, { leadId: lead._id, triggerAction: 'POST_CALL_FOLLOWUP' });
+            const result = await this.whatsappService.sendFollowupWithAttachments(call.phoneNumber, followupMessage, 'POST_CALL_FOLLOWUP', { leadId: lead._id, triggerAction: 'POST_CALL_FOLLOWUP' });
             await this.actionEventModel.create({
                 type: 'FOLLOWUP_SENT',
                 callId: callObjectId,

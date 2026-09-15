@@ -17,8 +17,12 @@ export class UpdateLeadDto {
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) buyingSignals?: string[];
   @ApiPropertyOptional() @IsOptional() @IsString() language?: string;
 }
+type WhatsappTriggerType =
+  | 'HOT_MID_CALL'
+  | 'POST_CALL_FOLLOWUP';
 
 export class SendWhatsappDto {
+  type!: WhatsappTriggerType;
   @ApiProperty() @IsString() callId!: string;
   @ApiProperty() @IsString() messageContent!: string;
 }
