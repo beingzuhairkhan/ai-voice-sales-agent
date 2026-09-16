@@ -13,11 +13,10 @@ async function bootstrap() {
 
   app.useLogger(app.get(Logger));
   app.use(helmet());
-  app.enableCors({
-    origin: ['http://localhost:5173', 'https://your-production-frontend.com'],
-    credentials: true,
-  });
-
+ app.enableCors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+});
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
