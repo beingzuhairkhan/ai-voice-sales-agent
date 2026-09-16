@@ -3,12 +3,15 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CallsService } from './calls.service';
 import { StartCallDto, CallQueryDto } from './dto/call.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { LeadsService } from '@/leads/leads.service';
 
 @ApiTags('Calls')
 @ApiBearerAuth()
 @Controller('calls')
 export class CallsController {
-  constructor(private callsService: CallsService) { }
+  constructor(private callsService: CallsService,
+    private leadsService: LeadsService
+  ) { }
 
     @Get('actions')
   @ApiOperation({ summary: 'Get all action events with pagination, search, and status filter' })
@@ -57,8 +60,8 @@ export class CallsController {
   @Get(':id/lead')
   @ApiOperation({ summary: 'Get the lead associated with a call' })
   async getLead(@Param('id') id: string) {
-    const call = await this.callsService.getCallById(id);
-    return { callId: id, leadId: call.leadId };
+    const lead = await this.leadsService.getLeadByCallId(id);
+    return lead ? lead : { message: `No lead found for call ID ${id}` };
   }
 
 
