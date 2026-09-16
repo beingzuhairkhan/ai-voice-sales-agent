@@ -3,6 +3,19 @@ import { StartCallDto, CallQueryDto } from './dto/call.dto';
 export declare class CallsController {
     private callsService;
     constructor(callsService: CallsService);
+    getAllActions(page?: string, limit?: string, search?: string, status?: string): Promise<{
+        data: (import("mongoose").Document<unknown, {}, import("../common/types/action-event.schema").ActionEvent, {}, {}> & import("../common/types/action-event.schema").ActionEvent & Required<{
+            _id: import("mongoose").Types.ObjectId;
+        }> & {
+            __v: number;
+        })[];
+        meta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    }>;
     startCall(dto: StartCallDto): Promise<{
         callId: string;
         vapiCallId: string;

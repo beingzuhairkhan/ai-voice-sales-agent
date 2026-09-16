@@ -101,13 +101,9 @@ export class VoiceToolsController {
       );
     }
 
-    console.log('SEND WHATSAPP: callId:', callId, 'leadId:', leadId, 'messageContent:', messageContent);
-
-    // const msg = await this.llmProvider.summarize(
-    //   messageContent,SUMMARIZE_PROMPT
-    // )
-
-    // console.log('SEND WHATSAPP: Generated summary:', msg);
+    const msg = await this.llmProvider.summarize(
+      messageContent,SUMMARIZE_PROMPT
+    )
 
 
     const result = await this.voiceToolsService.sendWhatsapp({
@@ -115,7 +111,7 @@ export class VoiceToolsController {
       callId,
       leadId,
       vapiCallId: body?.message?.call?.id,
-      messageContent,
+      msg,
     });
 
 

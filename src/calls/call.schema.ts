@@ -62,12 +62,12 @@ export class Call {
   @Prop({ type: Object, default: {} })
   metadata!: Record<string, any>;
 
-  @Prop({
-    required: true,
-    enum: ['pending', 'scheduled', 'in-progress', 'completed', 'cancelled'],
-    default: 'pending',
-  })
-  followUpStatus!: FollowUpStatus;
+  // @Prop({
+  //   required: true,
+  //   enum: ['pending', 'scheduled', 'in-progress', 'completed', 'cancelled'],
+  //   default: 'pending',
+  // })
+  // followUpStatus!: FollowUpStatus;
 
 
   createdAt!: Date;

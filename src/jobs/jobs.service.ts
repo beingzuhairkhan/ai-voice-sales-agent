@@ -9,23 +9,18 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Queue, Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
+import { Cron } from '@nestjs/schedule';
 
 import { Call } from '../calls/call.schema';
 import { Callback } from '@/callback/callback.schema';
-import { Lead } from '../leads/lead.schema'
+import { Lead } from '../leads/lead.schema';
 
 import { FollowupOrchestratorService } from '../followup/followup-orchestrator.service';
-// import { ExtractionService } from '../lead/extraction.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { CallsService } from '@/calls/calls.service';
-// import { FollowupGenService } from '../followup/followup-gen.service';
-// import { WhatsappService } from '../whatsapp/whatsapp.service';
-// import { ActionEvent } from '../action-events/action-event.schema';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 export const FOLLOWUP_QUEUE = 'followup-queue';
 export const WHATSAPP_RETRY_QUEUE = 'whatsapp-retry-queue';
-export const CLEANUP_QUEUE = 'cleanup-queue';
 export const CALLBACK_QUEUE = 'callback-queue';
 
 export type FollowUpStatus =
@@ -47,14 +42,16 @@ export type CallbackStatus =
 export class JobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobsService.name);
 
-  private connection: Redis;
+  private redis!: Redis;
 
-  private followupQueue: Queue;
-  private callbackQueue: Queue;
-  private whatsappRetryQueue: Queue;
+  private followupQueue!: Queue;
+  private callbackQueue!: Queue;
+  private whatsappRetryQueue!: Queue;
 
   private followupWorker?: Worker;
   private callbackWorker?: Worker;
+
+  private readonly redisUrl: string;
 
   constructor(
     private readonly config: ConfigService,
@@ -68,272 +65,676 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     @InjectModel(Lead.name)
     private readonly leadModel: Model<Lead>,
 
-    // @InjectModel(ActionEvent.name)
-    // private readonly actionEventModel: Model<ActionEvent>,
-
     private readonly followupOrchestrator: FollowupOrchestratorService,
-    // private readonly extractionService: ExtractionService,
+
     private readonly conversationsService: ConversationsService,
-    // private readonly followupGen: FollowupGenService,
-    // private readonly whatsappService: WhatsappService,
+
     private readonly callsService: CallsService,
   ) {
-    // const redisUrl = this.config.get<string>(
-    //   'REDIS_URL',
-    //   'redis://localhost:6379',
-    // );
-    const redisUrl = 'rediss://default:gQAAAAAAAutcAAIgcDFhMWFhMjU1NDA0ZGE0YzE1OGJlYTA0ZjE5MzdjZjgyZg@cheerful-kitten-191324.upstash.io:6379'
+    const redisUrl =
+      this.config.get<string>('REDIS_URL');
 
-    this.connection = new Redis(redisUrl, {
+    if (!redisUrl) {
+      throw new Error(
+        'REDIS_URL is not configured',
+      );
+    }
+
+    this.redisUrl = redisUrl;
+
+    this.logger.log(
+      `Redis URL configured: ${this.maskRedisUrl(redisUrl)}`,
+    );
+    this.redis = new Redis(this.redisUrl, {
       maxRetriesPerRequest: null,
-    });
+      enableReadyCheck: true,
 
-    this.followupQueue = new Queue(FOLLOWUP_QUEUE, {
-      connection: this.connection,
-    });
-
-    this.callbackQueue = new Queue(CALLBACK_QUEUE, {
-      connection: this.connection,
-    });
-
-    this.whatsappRetryQueue = new Queue(WHATSAPP_RETRY_QUEUE, {
-      connection: this.connection,
-    });
-  }
-
-  // ============================================================
-  // MODULE INIT
-  // ============================================================
-
- async onModuleInit(): Promise<void> {
-  console.log('🔥 JobsService onModuleInit');
-
-  try {
-    await this.connection.ping();
-    console.log('🔥 Redis connected:', await this.connection.ping());
-  } catch (error) {
-    console.error('❌ Redis connection failed:', error);
-  }
-
-  this.startFollowupWorker();
-  this.startCallbackWorker();
-
-  console.log('🔥 JobsService workers started');
-}
-
-
-  // ============================================================
-  // FOLLOW-UP WORKER
-  // ============================================================
-
-  private startFollowupWorker(): void {
-  console.log('🔥 Creating FOLLOWUP worker');
-
-  this.followupWorker = new Worker(
-    FOLLOWUP_QUEUE,
-    async (job: Job) => {
-      console.log('🔥🔥🔥 FOLLOWUP JOB RECEIVED 🔥🔥🔥');
-      console.log('JOB ID:', job.id);
-      console.log('JOB NAME:', job.name);
-      console.log('JOB DATA:', job.data);
-
-      const { callId } = job.data as {
-        callId: string;
-      };
-
-      console.log(
-        '🔥 Calling processCompletedCall:',
-        callId,
-      );
-
-      const result =
-        await this.followupOrchestrator.processCompletedCall(
-          callId,
+      retryStrategy: (times) => {
+        const delay = Math.min(
+          times * 500,
+          5000,
         );
 
-      console.log(
-        '🔥 processCompletedCall result:',
-        result,
-      );
-
-      return result;
-    },
-    {
-      connection: this.connection.duplicate(),
-      concurrency: 5,
-    },
-  );
-
-  this.followupWorker.on('ready', () => {
-    console.log('✅ FOLLOWUP WORKER READY');
-  });
-
-  this.followupWorker.on('active', (job) => {
-    console.log('🚀 FOLLOWUP JOB ACTIVE:', job.id);
-  });
-
-  this.followupWorker.on('completed', (job, result) => {
-    console.log('✅ FOLLOWUP JOB COMPLETED:', {
-      jobId: job.id,
-      result,
-    });
-  });
-
-  this.followupWorker.on('failed', (job, error) => {
-    console.error('❌ FOLLOWUP JOB FAILED:', {
-      jobId: job?.id,
-      error: error.message,
-      stack: error.stack,
-    });
-  });
-
-  this.followupWorker.on('error', (error) => {
-    console.error('❌ FOLLOWUP WORKER ERROR:', error);
-  });
-
-  console.log('🔥 FOLLOWUP WORKER CREATED');
-}
-
-
-  // ============================================================
-  // CALLBACK WORKER
-  // ============================================================
-
-  private startCallbackWorker(): void {
-    this.callbackWorker = new Worker(
-      CALLBACK_QUEUE,
-      async (job: Job) => {
-        const { callbackId } = job.data as {
-          callbackId: string;
-        };
-
-        this.logger.log(
-          {
-            callbackId,
-            jobId: job.id,
-          },
-          'Processing callback job',
+        this.logger.warn(
+          `Redis retry #${times} in ${delay}ms`,
         );
 
-        await this.processCallback(callbackId);
+        return delay;
       },
+    });
+
+    this.redis.on('connect', () => {
+      this.logger.log('🔌 Redis connecting');
+    });
+
+    this.redis.on('ready', () => {
+      this.logger.log(' Redis READY');
+    });
+
+    this.redis.on('error', (error) => {
+      this.logger.error(
+        `Redis ERROR: ${error.message}`,
+      );
+    });
+
+    this.followupQueue = new Queue(
+      FOLLOWUP_QUEUE,
       {
-        connection: this.connection.duplicate(),
-        concurrency: 3,
+        connection: {
+          url: this.redisUrl,
+          maxRetriesPerRequest: null,
+        },
       },
     );
 
-    this.callbackWorker.on('completed', (job) => {
-      this.logger.log(
-        {
-          jobId: job.id,
+    this.callbackQueue = new Queue(
+      CALLBACK_QUEUE,
+      {
+        connection: {
+          url: this.redisUrl,
+          maxRetriesPerRequest: null,
         },
-        'Callback job completed',
-      );
-    });
+      },
+    );
 
-    this.callbackWorker.on('failed', (job, error) => {
-      this.logger.error(
-        {
-          jobId: job?.id,
-          error: error.message,
+    this.whatsappRetryQueue = new Queue(
+      WHATSAPP_RETRY_QUEUE,
+      {
+        connection: {
+          url: this.redisUrl,
+          maxRetriesPerRequest: null,
         },
-        'Callback job failed',
-      );
-    });
-
-    this.callbackWorker.on('error', (error) => {
-      this.logger.error(
-        {
-          error: error.message,
-        },
-        'Callback worker error',
-      );
-    });
+      },
+    );
   }
 
-  // ============================================================
-  // ENQUEUE POST-CALL FOLLOW-UP
-  // ============================================================
 
-async enqueuePostCallFollowup(
-  callId: string | Types.ObjectId,
-): Promise<void> {
-  const callIdString = callId.toString();
+  // INIT
 
-  console.log('🔥 BEFORE ADD');
+  async onModuleInit(): Promise<void> {
+    this.logger.log(
+      ' JobsService onModuleInit',
+    );
 
-  const job = await this.followupQueue.add(
-    'POST_CALL_FOLLOWUP',
-    {
-      callId: callIdString,
-    },
-    {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000,
+    await this.testRedis();
+
+    await this.startFollowupWorker();
+
+    await this.startCallbackWorker();
+
+    await this.waitForWorkers();
+
+    await this.logFollowupQueueState(
+      'AFTER WORKERS STARTED',
+    );
+
+    this.logger.log(
+      ' All BullMQ workers started',
+    );
+  }
+
+
+  // REDIS TEST
+
+
+  private async testRedis(): Promise<void> {
+    try {
+      this.logger.log(
+        ' Testing Redis...',
+      );
+
+      const ping =
+        await this.redis.ping();
+
+      this.logger.log(
+        ` Redis PING: ${ping}`,
+      );
+
+      const info =
+        await this.redis.info(
+          'server',
+        );
+
+      const version =
+        info
+          .split('\n')
+          .find((line) =>
+            line.startsWith(
+              'redis_version:',
+            ),
+          );
+
+      this.logger.log(
+        ` Redis version: ${version ?? 'unknown'}`,
+      );
+
+      this.logger.log(
+        ` Redis status: ${this.redis.status}`,
+      );
+
+      const dbSize =
+        await this.redis.dbsize();
+
+      this.logger.log(
+        ` Redis DB size: ${dbSize}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        ' Redis test failed',
+        error instanceof Error
+          ? error.stack
+          : String(error),
+      );
+
+      throw error;
+    }
+  }
+
+
+  // FOLLOWUP WORKER
+
+  private async startFollowupWorker(): Promise<void> {
+    this.logger.log(
+      ' Creating FOLLOWUP worker',
+    );
+
+    this.followupWorker =
+      new Worker(
+        FOLLOWUP_QUEUE,
+
+        async (
+          job: Job,
+        ) => {
+          this.logger.log(
+            ` FOLLOWUP JOB RECEIVED: ${job.id}`,
+          );
+
+          this.logger.log(
+            {
+              jobId: job.id,
+              jobName: job.name,
+              jobData: job.data,
+            },
+            ' FOLLOWUP JOB DATA',
+          );
+
+          const {
+            callId,
+          } = job.data as {
+            callId?: string;
+          };
+
+          if (!callId) {
+            throw new Error(
+              'FOLLOWUP job is missing callId',
+            );
+          }
+
+          this.logger.log(
+            ` Processing call: ${callId}`,
+          );
+
+          const result =
+            await this.followupOrchestrator
+              .processCompletedCall(
+                callId,
+              );
+
+          this.logger.log(
+            {
+              jobId: job.id,
+              callId,
+              result,
+            },
+            ' FOLLOWUP PROCESSING FINISHED',
+          );
+
+          return result;
+        },
+
+        {
+          connection: {
+            url: this.redisUrl,
+            maxRetriesPerRequest: null,
+          },
+          concurrency: 5,
+          autorun: true,
+          drainDelay: 5,
+          lockDuration: 60000,
+        },
+      );
+
+
+    // WORKER EVENTS
+
+
+    this.followupWorker.on(
+      'ready',
+      async () => {
+        this.logger.log(
+          ' FOLLOWUP WORKER READY',
+        );
+
+        await this.logFollowupQueueState(
+          'WORKER READY',
+        );
+
+        const waiting =
+          await this.followupQueue.getWaiting(
+            0,
+            20,
+          );
+
+        this.logger.log(
+          {
+            count: waiting.length,
+            jobs: waiting.map(
+              (job) => ({
+                id: job.id,
+                name: job.name,
+                data: job.data,
+              }),
+            ),
+          },
+          ' WAITING FOLLOWUP JOBS',
+        );
       },
-      removeOnComplete: false,
-      removeOnFail: false,
-    },
-  );
+    );
 
-  console.log('🔥 FOLLOWUP JOB CREATED');
-  console.log('ID:', job.id);
-  console.log('NAME:', job.name);
-  console.log('DATA:', job.data);
+    this.followupWorker.on(
+      'active',
+      (job) => {
+        this.logger.log(
+          {
+            jobId: job.id,
+            name: job.name,
+            data: job.data,
+          },
+          ' FOLLOWUP JOB ACTIVE',
+        );
+      },
+    );
 
-  const counts = await this.followupQueue.getJobCounts(
-    'waiting',
-    'active',
-    'completed',
-    'failed',
-    'delayed',
-    'paused',
-  );
+    this.followupWorker.on(
+      'completed',
+      (job, result) => {
+        this.logger.log(
+          {
+            jobId: job.id,
+            result,
+          },
+          ' FOLLOWUP JOB COMPLETED',
+        );
+      },
+    );
 
-  console.log('🔥 QUEUE COUNTS:', counts);
+    this.followupWorker.on(
+      'failed',
+      (job, error) => {
+        this.logger.error(
+          {
+            jobId: job?.id,
+            jobName: job?.name,
+            jobData: job?.data,
+            error: error.message,
+            stack: error.stack,
+          },
+          ' FOLLOWUP JOB FAILED',
+        );
+      },
+    );
 
-  const storedJob = await this.followupQueue.getJob(job.id!);
+    this.followupWorker.on(
+      'stalled',
+      (jobId) => {
+        this.logger.error(
+          ` FOLLOWUP JOB STALLED: ${jobId}`,
+        );
+      },
+    );
 
-  console.log('🔥 STORED JOB:', {
-    id: storedJob?.id,
-    name: storedJob?.name,
-    data: storedJob?.data,
-    state: await storedJob?.getState(),
-  });
-}
+    this.followupWorker.on(
+      'error',
+      (error) => {
+        this.logger.error(
+          ` FOLLOWUP WORKER ERROR: ${error.message}`,
+          error.stack,
+        );
+      },
+    );
 
 
-  // ============================================================
+    await this.followupWorker.waitUntilReady();
+
+    this.logger.log(
+      ' FOLLOWUP WORKER CREATED + READY',
+    );
+  }
+
+
+  // CALLBACK WORKER
+
+  private async startCallbackWorker(): Promise<void> {
+    this.logger.log(
+      ' Creating CALLBACK worker',
+    );
+
+    this.callbackWorker =
+      new Worker(
+        CALLBACK_QUEUE,
+
+        async (
+          job: Job,
+        ) => {
+          this.logger.log(
+            {
+              jobId: job.id,
+              name: job.name,
+              data: job.data,
+            },
+            ' CALLBACK JOB RECEIVED',
+          );
+
+          const {
+            callbackId,
+          } = job.data as {
+            callbackId?: string;
+          };
+
+          if (!callbackId) {
+            throw new Error(
+              'Callback job is missing callbackId',
+            );
+          }
+
+          await this.processCallback(
+            callbackId,
+          );
+        },
+
+        {
+          connection: {
+            url: this.redisUrl,
+            maxRetriesPerRequest: null,
+          },
+
+          concurrency: 3,
+
+          autorun: true,
+
+          drainDelay: 5,
+
+          lockDuration: 60000,
+        },
+      );
+
+    this.callbackWorker.on(
+      'ready',
+      () => {
+        this.logger.log(
+          ' CALLBACK WORKER READY',
+        );
+      },
+    );
+
+    this.callbackWorker.on(
+      'active',
+      (job) => {
+        this.logger.log(
+          {
+            jobId: job.id,
+            name: job.name,
+            data: job.data,
+          },
+          ' CALLBACK JOB ACTIVE',
+        );
+      },
+    );
+
+    this.callbackWorker.on(
+      'completed',
+      (job) => {
+        this.logger.log(
+          {
+            jobId: job.id,
+          },
+          ' CALLBACK JOB COMPLETED',
+        );
+      },
+    );
+
+    this.callbackWorker.on(
+      'failed',
+      (job, error) => {
+        this.logger.error(
+          {
+            jobId: job?.id,
+            error: error.message,
+            stack: error.stack,
+          },
+          ' CALLBACK JOB FAILED',
+        );
+      },
+    );
+
+    this.callbackWorker.on(
+      'stalled',
+      (jobId) => {
+        this.logger.error(
+          ` CALLBACK JOB STALLED: ${jobId}`,
+        );
+      },
+    );
+
+    this.callbackWorker.on(
+      'error',
+      (error) => {
+        this.logger.error(
+          ` CALLBACK WORKER ERROR: ${error.message}`,
+          error.stack,
+        );
+      },
+    );
+
+    await this.callbackWorker.waitUntilReady();
+
+    this.logger.log(
+      ' CALLBACK WORKER CREATED + READY',
+    );
+  }
+
+
+  // WAIT FOR WORKERS
+
+
+  private async waitForWorkers(): Promise<void> {
+    if (this.followupWorker) {
+      await this.followupWorker.waitUntilReady();
+    }
+
+    if (this.callbackWorker) {
+      await this.callbackWorker.waitUntilReady();
+    }
+
+    this.logger.log(
+      ' All BullMQ workers are ready',
+    );
+  }
+
+
+  // QUEUE STATE
+
+
+  private async logFollowupQueueState(
+    source: string,
+  ): Promise<void> {
+    try {
+      const counts =
+        await this.followupQueue.getJobCounts(
+          'waiting',
+          'active',
+          'completed',
+          'failed',
+          'delayed',
+          'paused',
+        );
+
+      this.logger.log(
+        {
+          source,
+          ...counts,
+        },
+        ` FOLLOWUP QUEUE [${source}]`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed reading followup queue: ${error instanceof Error
+          ? error.message
+          : String(error)
+        }`,
+      );
+    }
+  }
+
+
+  // ENQUEUE POST-CALL FOLLOWUP
+
+
+  async enqueuePostCallFollowup(
+    callId: string | Types.ObjectId,
+  ): Promise<void> {
+    const callIdString =
+      callId.toString();
+
+    this.logger.log(
+      {
+        queue: FOLLOWUP_QUEUE,
+        callId: callIdString,
+      },
+      ' ABOUT TO ADD FOLLOWUP JOB',
+    );
+
+    const job =
+      await this.followupQueue.add(
+        'POST_CALL_FOLLOWUP',
+        {
+          callId: callIdString,
+        },
+        {
+          attempts: 3,
+
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+
+          removeOnComplete: false,
+
+          removeOnFail: false,
+        },
+      );
+
+    this.logger.log(
+      {
+        jobId: job.id,
+        name: job.name,
+        data: job.data,
+      },
+      ' FOLLOWUP JOB CREATED',
+    );
+
+    const state =
+      await job.getState();
+
+    this.logger.log(
+      {
+        jobId: job.id,
+        state,
+      },
+      ' FOLLOWUP JOB STATE',
+    );
+
+    await this.logFollowupQueueState(
+      'AFTER ADD',
+    );
+
+    setTimeout(
+      async () => {
+        try {
+          const latest =
+            await this.followupQueue.getJob(
+              job.id!,
+            );
+
+          if (!latest) {
+            this.logger.warn(
+              `Job ${job.id} no longer exists`,
+            );
+
+            return;
+          }
+
+          const latestState =
+            await latest.getState();
+
+          this.logger.log(
+            {
+              jobId: latest.id,
+              state: latestState,
+            },
+            ' FOLLOWUP JOB STATE AFTER 5 SECONDS',
+          );
+
+          await this.logFollowupQueueState(
+            '5 SECONDS AFTER ADD',
+          );
+        } catch (error) {
+          this.logger.error(
+            'Delayed followup inspection failed',
+            error instanceof Error
+              ? error.stack
+              : String(error),
+          );
+        }
+      },
+      5000,
+    );
+  }
+
+
   // WHATSAPP RETRY
-  // ============================================================
+
 
   async enqueueWhatsappRetry(
     messageId: string,
     phoneNumber: string,
     message: string,
   ): Promise<void> {
-    await this.whatsappRetryQueue.add(
-      'whatsapp-retry',
-      {
-        messageId,
-        phoneNumber,
-        message,
-      },
-      {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 10000,
+    const job =
+      await this.whatsappRetryQueue.add(
+        'whatsapp-retry',
+        {
+          messageId,
+          phoneNumber,
+          message,
         },
-        removeOnComplete: true,
-      },
-    );
+        {
+          attempts: 3,
+
+          backoff: {
+            type: 'exponential',
+            delay: 10000,
+          },
+
+          removeOnComplete: true,
+
+          removeOnFail: false,
+        },
+      );
 
     this.logger.log(
       {
+        jobId: job.id,
         messageId,
         phoneNumber,
       },
@@ -341,87 +742,83 @@ async enqueuePostCallFollowup(
     );
   }
 
-  // ============================================================
-  // CHECK SCHEDULED CALLBACKS
-  // ============================================================
+
+  // CALLBACK CRON
+
 
   @Cron('*/59 * * * *')
   async processScheduledCallbacks(): Promise<void> {
-    const now = new Date();
+    const now =
+      new Date();
 
-    // Only pick callbacks scheduled within the next 1 hour.
-    const oneHourFromNow = new Date(
-      now.getTime() + 60 * 60 * 1000,
-    );
+    const oneHourFromNow =
+      new Date(
+        now.getTime() +
+        60 * 60 * 1000,
+      );
 
     this.logger.log(
       {
         now,
         oneHourFromNow,
       },
-      'Checking callbacks scheduled within the next hour',
+      'Checking callbacks scheduled within next hour',
     );
 
-    const callbacks = await this.callbackModel
-      .find({
-        status: 'scheduled',
-        parsedDateTime: {
-          $gte: now,
-          $lte: oneHourFromNow,
-        },
-      })
-      .sort({
-        parsedDateTime: 1,
-      })
-      .limit(50)
-      .exec();
+    const callbacks =
+      await this.callbackModel
+        .find({
+          status: 'scheduled',
 
-    if (callbacks.length === 0) {
-      this.logger.log('No callbacks scheduled within the next hour');
+          parsedDateTime: {
+            $gte: now,
+            $lte: oneHourFromNow,
+          },
+        })
+        .sort({
+          parsedDateTime: 1,
+        })
+        .limit(50)
+        .exec();
+
+    if (!callbacks.length) {
+      this.logger.log(
+        'No callbacks scheduled within next hour',
+      );
+
       return;
     }
 
-    this.logger.log(
-      {
-        count: callbacks.length,
-      },
-      'Found callbacks scheduled within the next hour',
-    );
-
-    for (const callback of callbacks) {
+    for (
+      const callback of callbacks
+    ) {
       try {
-        // Prevent duplicate queueing.
-        const updated = await this.callbackModel.findOneAndUpdate(
-          {
-            _id: callback._id,
-            status: 'scheduled',
-          },
-          {
-            $set: {
-              status: 'queued',
-              updatedAt: new Date(),
-            },
-          },
-          {
-            new: true,
-          },
-        );
-
-        if (!updated) {
-          this.logger.log(
+        const updated =
+          await this.callbackModel.findOneAndUpdate(
             {
-              callbackId: callback._id.toString(),
+              _id: callback._id,
+              status: 'scheduled',
             },
-            'Callback already queued or processed',
+            {
+              $set: {
+                status: 'queued',
+                updatedAt: new Date(),
+              },
+            },
+            {
+              new: true,
+            },
           );
 
+        if (!updated) {
           continue;
         }
 
         if (!callback.parsedDateTime) {
           this.logger.warn(
             {
-              callbackId: callback._id.toString(),
+              callbackId:
+                callback._id.toString(),
             },
             'Callback has no parsedDateTime',
           );
@@ -429,37 +826,43 @@ async enqueuePostCallFollowup(
           continue;
         }
 
-        // Delay BullMQ job until the actual callback time.
-        const delay = Math.max(
-          callback.parsedDateTime.getTime() - Date.now(),
-          0,
-        );
+        const delay =
+          Math.max(
+            callback.parsedDateTime.getTime() -
+            Date.now(),
+            0,
+          );
 
-        await this.callbackQueue.add(
-          'execute-callback',
-          {
-            callbackId: callback._id.toString(),
-          },
-          {
-            delay,
-
-            attempts: 3,
-
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
+        const job =
+          await this.callbackQueue.add(
+            'execute-callback',
+            {
+              callbackId:
+                callback._id.toString(),
             },
+            {
+              delay,
 
-            removeOnComplete: true,
+              attempts: 3,
 
-            removeOnFail: false,
-          },
-        );
+              backoff: {
+                type: 'exponential',
+                delay: 5000,
+              },
+
+              removeOnComplete: true,
+
+              removeOnFail: false,
+            },
+          );
 
         this.logger.log(
           {
-            callbackId: callback._id.toString(),
-            scheduledTime: callback.parsedDateTime,
+            callbackId:
+              callback._id.toString(),
+            jobId: job.id,
+            scheduledTime:
+              callback.parsedDateTime,
             delayMs: delay,
           },
           'Callback queued successfully',
@@ -467,11 +870,12 @@ async enqueuePostCallFollowup(
       } catch (error) {
         this.logger.error(
           {
-            callbackId: callback._id.toString(),
+            callbackId:
+              callback._id.toString(),
             error:
               error instanceof Error
                 ? error.message
-                : 'Unknown error',
+                : String(error),
           },
           'Failed to queue callback',
         );
@@ -479,126 +883,184 @@ async enqueuePostCallFollowup(
     }
   }
 
-  // ============================================================
-  // EXECUTE CALLBACK
-  // ============================================================
 
-  private async processCallback(callbackId: string): Promise<void> {
-    const callback = await this.callbackModel
-      .findById(callbackId)
-      .exec();
+  // PROCESS CALLBACK
+
+
+  private async processCallback(
+    callbackId: string,
+  ): Promise<void> {
+    const callback =
+      await this.callbackModel
+        .findById(callbackId)
+        .exec();
 
     if (!callback) {
-      this.logger.error({ callbackId }, 'Callback not found');
-      return;
+      throw new Error(
+        `Callback not found: ${callbackId}`,
+      );
     }
 
-    if (callback.status !== 'queued') {
+    if (
+      callback.status !== 'queued'
+    ) {
       this.logger.warn(
         {
           callbackId,
           status: callback.status,
         },
-        'Callback is not in queued state',
+        'Callback is not queued',
       );
+
       return;
     }
 
     try {
-      // Get the original call
-      const originalCall = await this.callModel
-        .findById(callback.callId)
-        .exec();
+      const originalCall =
+        await this.callModel
+          .findById(
+            callback.callId,
+          )
+          .exec();
 
       if (!originalCall) {
-        throw new Error('Original call not found');
+        throw new Error(
+          'Original call not found',
+        );
       }
 
-      // Get original transcript
-      let transcript = originalCall.transcript || '';
+      let transcript =
+        originalCall.transcript ||
+        '';
 
       if (!transcript) {
         transcript =
-          await this.conversationsService.getTranscriptText(
-            originalCall._id,
-          );
+          await this.conversationsService
+            .getTranscriptText(
+              originalCall._id,
+            );
       }
 
-      // Get lead/context from original conversation
-      const lead = await this.leadModel
-        .findOne({
-          callId: originalCall._id,
-        })
-        .exec();
+      const lead =
+        await this.leadModel
+          .findOne({
+            callId:
+              originalCall._id,
+          })
+          .exec();
 
       if (!lead) {
-        throw new Error('Lead not found for callback');
+        throw new Error(
+          'Lead not found for callback',
+        );
       }
 
-      // queued -> in-progress
-      await this.callbackModel.findOneAndUpdate(
-        {
-          _id: callback._id,
-          status: 'queued',
-        },
-        {
-          $set: {
-            status: 'in-progress',
-            updatedAt: new Date(),
-          },
-        },
-      );
+      const updated =
+        await this.callbackModel
+          .findOneAndUpdate(
+            {
+              _id: callback._id,
+              status: 'queued',
+            },
+            {
+              $set: {
+                status: 'in-progress',
+                updatedAt: new Date(),
+              },
+            },
+            {
+              new: true,
+            },
+          );
 
-      // Context that the callback assistant needs
+      if (!updated) {
+        throw new Error(
+          'Callback was already processed by another worker',
+        );
+      }
+
       const callbackContext = {
-        callbackId: callback._id.toString(),
-        originalCallId: originalCall._id.toString(),
+        callbackId:
+          callback._id.toString(),
+
+        originalCallId:
+          originalCall._id.toString(),
 
         transcript,
 
         lead: {
           name: lead.name,
-          productDescription: lead.productDescription,
-          productCount: lead.productCount,
-          budget: lead.budget,
-          currency: lead.currency,
-          timeline: lead.timeline,
-          requiredFeatures: lead.requiredFeatures,
-          painPoints: lead.painPoints,
-          barriers: lead.barriers,
-          objections: lead.objections,
-          buyingSignals: lead.buyingSignals,
-          temperature: lead.temperature,
-          language: lead.language,
+
+          productDescription:
+            lead.productDescription,
+
+          productCount:
+            lead.productCount,
+
+          budget:
+            lead.budget,
+
+          currency:
+            lead.currency,
+
+          timeline:
+            lead.timeline,
+
+          requiredFeatures:
+            lead.requiredFeatures,
+
+          painPoints:
+            lead.painPoints,
+
+          barriers:
+            lead.barriers,
+
+          objections:
+            lead.objections,
+
+          buyingSignals:
+            lead.buyingSignals,
+
+          temperature:
+            lead.temperature,
+
+          language:
+            lead.language,
         },
       };
 
       this.logger.log(
         {
           callbackId,
-          phoneNumber: originalCall.phoneNumber,
+          phoneNumber:
+            originalCall.phoneNumber,
         },
         'Starting scheduled callback',
       );
 
-      // Reuse your existing Vapi startCall()
-      const result = await this.callsService.startCall(
-        originalCall.phoneNumber,
-        originalCall.metadata.assistantId,
-        callbackContext,
-      );
+      const result =
+        await this.callsService.startCall(
+          originalCall.phoneNumber,
+          originalCall.metadata.assistantId,
+          callbackContext,
+        );
 
-      // Store the newly created Call ID against callback
-      await this.callbackModel.findByIdAndUpdate(
-        callback._id,
-        {
-          $set: {
-            callbackCallId: new Types.ObjectId(result.callId),
-            status: 'in-progress',
-            updatedAt: new Date(),
+      await this.callbackModel
+        .findByIdAndUpdate(
+          callback._id,
+          {
+            $set: {
+              callbackCallId:
+                new Types.ObjectId(
+                  result.callId,
+                ),
+
+              status: 'in-progress',
+
+              updatedAt: new Date(),
+            },
           },
-        },
-      );
+        );
 
       this.logger.log(
         {
@@ -606,24 +1068,25 @@ async enqueuePostCallFollowup(
           callId: result.callId,
           vapiCallId: result.vapiCallId,
         },
-        'Scheduled callback started successfully',
+        'Scheduled callback started',
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : 'Unknown error';
+          : String(error);
 
-      await this.callbackModel.findByIdAndUpdate(
-        callback._id,
-        {
-          $set: {
-            status: 'scheduled',
-            updatedAt: new Date(),
-            error: errorMessage,
+      await this.callbackModel
+        .findByIdAndUpdate(
+          callback._id,
+          {
+            $set: {
+              status: 'scheduled',
+              updatedAt: new Date(),
+              error: errorMessage,
+            },
           },
-        },
-      );
+        );
 
       this.logger.error(
         {
@@ -638,25 +1101,58 @@ async enqueuePostCallFollowup(
   }
 
 
+  // SHUTDOWN
 
-
-  // ============================================================
-  // MODULE DESTROY
-  // ============================================================
 
   async onModuleDestroy(): Promise<void> {
-    await this.followupWorker?.close();
-    await this.callbackWorker?.close();
+    this.logger.log(
+      ' Shutting down JobsService...',
+    );
 
-    await this.followupQueue.close();
-    await this.callbackQueue.close();
-    await this.whatsappRetryQueue.close();
+    try {
+      await this.followupWorker?.close();
 
-    await this.connection.quit();
+      await this.callbackWorker?.close();
 
-    this.logger.log('JobsService closed');
+      await this.followupQueue.close();
+
+      await this.callbackQueue.close();
+
+      await this.whatsappRetryQueue.close();
+
+      await this.redis.quit();
+
+      this.logger.log(
+        ' JobsService closed',
+      );
+    } catch (error) {
+      this.logger.error(
+        ' JobsService shutdown error',
+        error instanceof Error
+          ? error.stack
+          : String(error),
+      );
+    }
+  }
+
+
+  // HELPERS
+
+
+  private maskRedisUrl(
+    url: string,
+  ): string {
+    try {
+      const parsed =
+        new URL(url);
+
+      if (parsed.password) {
+        parsed.password = '***';
+      }
+
+      return parsed.toString();
+    } catch {
+      return 'configured';
+    }
   }
 }
-
-
-

@@ -21,6 +21,7 @@ const qualification_module_1 = require("../qualification/qualification.module");
 const whatsapp_module_1 = require("../whatsapp/whatsapp.module");
 const jobs_service_1 = require("../jobs/jobs.service");
 const bullmq_1 = require("@nestjs/bullmq");
+const jobs_module_1 = require("../jobs/jobs.module");
 let WebhooksModule = class WebhooksModule {
 };
 exports.WebhooksModule = WebhooksModule;
@@ -40,6 +41,7 @@ exports.WebhooksModule = WebhooksModule = __decorate([
             ai_module_1.AiModule,
             qualification_module_1.QualificationModule,
             whatsapp_module_1.WhatsAppModule,
+            jobs_module_1.JobsModule
         ],
         controllers: [webhooks_controller_1.WebhooksController],
         providers: [webhooks_service_1.WebhooksService],

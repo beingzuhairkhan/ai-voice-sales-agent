@@ -66,6 +66,7 @@ let DashboardController = class DashboardController {
         return this.leadsService.getLeads(query);
     }
     async getLead(id) {
+        console.log('Fetching lead with ID:', id);
         return this.leadsService.getLeadById(id);
     }
     async getCallbacks(page, limit, status) {
@@ -94,7 +95,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('leads/:id'),
     (0, swagger_1.ApiOperation)({ summary: 'Get a single lead by ID' }),
-    __param(0, (0, common_1.Query)('id')),
+    __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)

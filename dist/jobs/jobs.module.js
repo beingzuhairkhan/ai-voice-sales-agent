@@ -16,13 +16,28 @@ const callback_module_1 = require("../callback/callback.module");
 const leads_module_1 = require("../leads/leads.module");
 const conversations_module_1 = require("../conversations/conversations.module");
 const calls_module_1 = require("../calls/calls.module");
+const callback_schema_1 = require("../callback/callback.schema");
+const lead_schema_1 = require("../leads/lead.schema");
 let JobsModule = class JobsModule {
 };
 exports.JobsModule = JobsModule;
 exports.JobsModule = JobsModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            mongoose_1.MongooseModule.forFeature([{ name: call_schema_1.Call.name, schema: call_schema_1.CallSchema }]),
+            mongoose_1.MongooseModule.forFeature([
+                {
+                    name: call_schema_1.Call.name,
+                    schema: call_schema_1.CallSchema,
+                },
+                {
+                    name: callback_schema_1.Callback.name,
+                    schema: callback_schema_1.CallbackSchema,
+                },
+                {
+                    name: lead_schema_1.Lead.name,
+                    schema: lead_schema_1.LeadSchema,
+                },
+            ]),
             followup_module_1.FollowupModule,
             callback_module_1.CallbackModule,
             leads_module_1.LeadsModule,

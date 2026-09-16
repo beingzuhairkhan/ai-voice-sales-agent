@@ -166,6 +166,37 @@ let CallsService = CallsService_1 = class CallsService {
             success,
         });
     }
+    async getAllActions(page = 1, limit = 10, search, status) {
+        const skip = (page - 1) * limit;
+        const filter = {};
+        if (status && status.trim() !== '') {
+            filter.status = status;
+        }
+        if (search && search.trim() !== '') {
+            filter.$or = [
+                { message: { $regex: search, $options: 'i' } },
+                { type: { $regex: search, $options: 'i' } },
+            ];
+        }
+        const [data, total] = await Promise.all([
+            this.actionEventModel
+                .find(filter)
+                .sort({ createdAt: 1 })
+                .skip(skip)
+                .limit(limit)
+                .exec(),
+            this.actionEventModel.countDocuments(filter).exec(),
+        ]);
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
 };
 exports.CallsService = CallsService;
 exports.CallsService = CallsService = CallsService_1 = __decorate([

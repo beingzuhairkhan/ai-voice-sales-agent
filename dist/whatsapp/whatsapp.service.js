@@ -52,7 +52,7 @@ let WhatsAppService = WhatsAppService_1 = class WhatsAppService {
                 result = await this.provider.sendTextMessage(phoneNumber, message);
             }
             record.providerMessageId = result.providerMessageId;
-            record.status = 'pending';
+            record.status = 'sent';
             record.deliveryInfo = result.rawResponse || {};
             return record.save();
         }

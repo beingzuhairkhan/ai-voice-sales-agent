@@ -44,4 +44,17 @@ export declare class CallsService {
     endCall(id: Types.ObjectId | string, duration?: number, summary?: string): Promise<void>;
     getActionsByCallId(id: string): Promise<ActionEvent[]>;
     recordAction(callId: Types.ObjectId | string, type: string, data?: Record<string, any>, success?: boolean): Promise<ActionEvent>;
+    getAllActions(page?: number, limit?: number, search?: string, status?: string): Promise<{
+        data: (import("mongoose").Document<unknown, {}, ActionEvent, {}, {}> & ActionEvent & Required<{
+            _id: Types.ObjectId;
+        }> & {
+            __v: number;
+        })[];
+        meta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    }>;
 }

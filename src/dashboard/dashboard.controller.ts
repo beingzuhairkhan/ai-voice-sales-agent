@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { LeadsService } from '../leads/leads.service';
@@ -39,10 +39,11 @@ export class DashboardController {
   }
 
   @Get('leads/:id')
-  @ApiOperation({ summary: 'Get a single lead by ID' })
-  async getLead(@Query('id') id: string) {
-    return this.leadsService.getLeadById(id);
-  }
+@ApiOperation({ summary: 'Get a single lead by ID' })
+async getLead(@Param('id') id: string) { 
+  console.log('Fetching lead with ID:', id);
+  return this.leadsService.getLeadById(id);
+}
 
   @Get('callbacks')
   @ApiOperation({ summary: 'List callbacks with pagination and status filter' })

@@ -23,6 +23,7 @@ const config_1 = require("@nestjs/config");
 const sarvam_provider_1 = require("../sarvam/sarvam-provider");
 const followup_generation_service_1 = require("../ai/followup-generation.service");
 const llm_provider_interface_1 = require("../ai/llm-provider.interface");
+const summarize_prompt_1 = require("../ai/prompts/summarize.prompt");
 let VoiceToolsController = class VoiceToolsController {
     constructor(voiceToolsService, sarvamTtsService, config, followupGen, llmProvider) {
         this.voiceToolsService = voiceToolsService;
@@ -71,13 +72,13 @@ let VoiceToolsController = class VoiceToolsController {
         if (!messageContent) {
             throw new common_1.BadRequestException('messageContent missing from Vapi tool arguments');
         }
-        console.log('SEND WHATSAPP: callId:', callId, 'leadId:', leadId, 'messageContent:', messageContent);
+        const msg = await this.llmProvider.summarize(messageContent, summarize_prompt_1.SUMMARIZE_PROMPT);
         const result = await this.voiceToolsService.sendWhatsapp({
             type: 'HOT_MID_CALL',
             callId,
             leadId,
             vapiCallId: body?.message?.call?.id,
-            messageContent,
+            msg,
         });
         return result;
     }

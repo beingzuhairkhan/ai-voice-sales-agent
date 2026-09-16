@@ -213,4 +213,43 @@ export class CallsService {
       success,
     });
   }
+
+  async getAllActions(page: number = 1, limit: number = 10, search?: string, status?: string) {
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+
+    if (status && status.trim() !== '') {
+      filter.status = status;
+    }
+
+    if (search && search.trim() !== '') {
+      filter.$or = [
+        { message: { $regex: search, $options: 'i' } },
+        { type: { $regex: search, $options: 'i' } },
+
+      ];
+    }
+
+    // Run queries in parallel
+    const [data, total] = await Promise.all([
+      this.actionEventModel
+        .find(filter)
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.actionEventModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }

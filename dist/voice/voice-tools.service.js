@@ -103,7 +103,12 @@ let VoiceToolsService = VoiceToolsService_1 = class VoiceToolsService {
     }
     async sendWhatsapp(dto) {
         try {
+            console.log("sendWhatsapp called with dto:", dto);
             const call = await this.validateActiveCall(dto.callId);
+            const messageContent = dto.messageContent ?? dto.msg;
+            if (!messageContent) {
+                throw new common_1.BadRequestException('WhatsApp message content is required');
+            }
             if (!call) {
                 throw new common_1.BadRequestException(`No call found for Vapi call ID: ${dto.callId}`);
             }
@@ -125,12 +130,12 @@ let VoiceToolsService = VoiceToolsService_1 = class VoiceToolsService {
                 data: {
                     trigger: 'VOICE_TOOL',
                     whatsappType: 'HOT_MID_CALL',
-                    messageLength: dto.messageContent.length,
+                    messageLength: messageContent.length
                 },
                 success: true,
             });
             try {
-                const whatsappMsg = await this.whatsappService.sendTextMessage(call.phoneNumber, dto.messageContent, {
+                const whatsappMsg = await this.whatsappService.sendTextMessage(call.phoneNumber, messageContent, {
                     leadId: lead._id,
                     triggerAction: 'HOT_MID_CALL',
                 }, 'HOT_MID_CALL');
@@ -300,7 +305,6 @@ let VoiceToolsService = VoiceToolsService_1 = class VoiceToolsService {
             ],
         })
             .exec();
-        console.log("voice service validateActiveCall", call);
         if (!call)
             throw new common_1.NotFoundException(`Call ${callId} not found`);
         if (call.status === 'ended' || call.status === 'failed' || call.status === 'cancelled') {

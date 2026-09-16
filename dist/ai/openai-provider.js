@@ -47,26 +47,33 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
     }
     async chatCompletion(messages, options) {
         try {
-            return await this.retryUtil.withRetry(() => this.sarvamChat(messages, options), {
+            const result = await this.retryUtil.withRetry(() => this.sarvamChat(messages, options), {
                 maxRetries: 2,
                 context: 'Sarvam.chatCompletion',
             });
+            if (!result?.trim()) {
+                throw new Error('Sarvam returned an empty response');
+            }
+            return result.trim();
         }
         catch (err) {
-            if (this.fallbackProvider === 'groq' &&
-                this.groqApiKey) {
+            this.logger.error(`Sarvam chatCompletion failed: ${err instanceof Error ? err.message : String(err)}`);
+            if (this.fallbackProvider === 'groq' && this.groqApiKey) {
                 this.logger.warn('Sarvam failed, falling back to Groq');
-                return this.retryUtil.withRetry(() => this.groqChat(messages, options), {
+                const result = await this.retryUtil.withRetry(() => this.groqChat(messages, options), {
                     maxRetries: 2,
                     context: 'Groq.chatCompletion',
                 });
+                if (!result?.trim()) {
+                    throw new Error('Groq returned an empty response');
+                }
+                return result.trim();
             }
             throw err;
         }
     }
     async summarize(transcript, systemPrompt) {
-        console.log("transcript", transcript);
-        return this.chatCompletion([
+        const result = await this.chatCompletion([
             {
                 role: 'system',
                 content: systemPrompt,
@@ -78,6 +85,7 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
         ], {
             temperature: 0.3,
         });
+        return result;
     }
     async sarvamStructuredCall(params) {
         const response = await fetch(`${this.sarvamBaseUrl}/chat/completions`, {
@@ -109,7 +117,6 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
             return JSON.parse(content);
         }
         catch (err) {
-            console.error('SARVAM INVALID JSON:', content);
             throw new Error(`Sarvam returned invalid JSON: ${content}`);
         }
     }
@@ -124,6 +131,7 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
                 model: options?.model || this.sarvamModel,
                 messages,
                 temperature: options?.temperature ?? 0.7,
+                max_tokens: 4096,
             }),
         });
         if (!response.ok) {
@@ -131,7 +139,11 @@ let OpenAiProvider = OpenAiProvider_1 = class OpenAiProvider {
             throw new Error(`Sarvam chat failed: ${response.status} ${text}`);
         }
         const data = await response.json();
-        return (data.choices?.[0]?.message?.content || '');
+        const content = data?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string' || !content.trim()) {
+            throw new Error(`Sarvam returned empty/invalid content: ${JSON.stringify(data)}`);
+        }
+        return content.trim();
     }
     async groqStructuredCall(params) {
         const messages = [...params.messages];

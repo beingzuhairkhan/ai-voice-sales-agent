@@ -16,7 +16,6 @@ export declare class Call {
     recordingUrl?: string;
     leadId?: Types.ObjectId;
     metadata: Record<string, any>;
-    followUpStatus: FollowUpStatus;
     createdAt: Date;
     updatedAt: Date;
 }

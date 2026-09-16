@@ -12,6 +12,7 @@ import { QualificationModule } from '../qualification/qualification.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { FOLLOWUP_QUEUE } from '@/jobs/jobs.service';
 import { BullModule } from '@nestjs/bullmq';
+import { JobsModule } from '@/jobs/jobs.module';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { BullModule } from '@nestjs/bullmq';
     AiModule,
     QualificationModule,
     WhatsAppModule,
-    
+    JobsModule
   ],
   controllers: [WebhooksController],
   providers: [WebhooksService],

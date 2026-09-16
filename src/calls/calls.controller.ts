@@ -8,13 +8,28 @@ import { Public } from '../common/decorators/public.decorator';
 @ApiBearerAuth()
 @Controller('calls')
 export class CallsController {
-  constructor(private callsService: CallsService) {}
+  constructor(private callsService: CallsService) { }
+
+    @Get('actions')
+  @ApiOperation({ summary: 'Get all action events with pagination, search, and status filter' })
+  async getAllActions(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+
+    return this.callsService.getAllActions(pageNum, limitNum, search, status);
+  }
+
 
   @Post('start')
-  @ApiOperation({ summary: 'Start an outbound call (defaults to +918688664337)' })
+  @ApiOperation({ summary: 'Start an outbound call (defaults to +919967705134)' })
   async startCall(@Body() dto: StartCallDto) {
     const assistandId = process.env.VAPI_ASSISTANT_ID;
-    if(!assistandId) {
+    if (!assistandId) {
       throw new Error('VAPI_ASSISTANT_ID is not set in environment variables');
     }
     return this.callsService.startCall(dto.phoneNumber, assistandId);
@@ -45,6 +60,8 @@ export class CallsController {
     const call = await this.callsService.getCallById(id);
     return { callId: id, leadId: call.leadId };
   }
+
+
 
   @Get(':id/actions')
   @ApiOperation({ summary: 'Get action events for a call' })

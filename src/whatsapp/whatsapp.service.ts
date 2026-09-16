@@ -61,7 +61,7 @@ export class WhatsAppService {
       }
 
       record.providerMessageId = result.providerMessageId;
-      record.status = 'pending';
+      record.status = 'sent';
       record.deliveryInfo = result.rawResponse || {};
 
       return record.save();

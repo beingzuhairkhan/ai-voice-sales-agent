@@ -11,6 +11,8 @@ import { FollowupService as FollowupGenerationService } from '../ai/followup-gen
 import { ConfigService } from '@nestjs/config';
 import { VapiWebhookEvent } from '../vapi/vapi-provider.interface';
 import { Queue } from 'bullmq';
+import { JobsService } from '@/jobs/jobs.service';
+import { LlmProvider } from '@/ai/llm-provider.interface';
 export interface WebhookProcessResult {
     status: 'processed' | 'duplicate' | 'ignored' | 'failed';
     callId?: string;
@@ -28,8 +30,10 @@ export declare class WebhooksService {
     private followupGen;
     private config;
     private readonly followupQueue;
+    private jobsService;
+    private llmProvider;
     private readonly logger;
-    constructor(webhookEventModel: Model<WebhookEvent>, actionEventModel: Model<ActionEvent>, callsService: CallsService, conversationsService: ConversationsService, leadsService: LeadsService, extractionService: LeadExtractionService, qualificationService: QualificationService, whatsappService: WhatsAppService, followupGen: FollowupGenerationService, config: ConfigService, followupQueue: Queue);
+    constructor(webhookEventModel: Model<WebhookEvent>, actionEventModel: Model<ActionEvent>, callsService: CallsService, conversationsService: ConversationsService, leadsService: LeadsService, extractionService: LeadExtractionService, qualificationService: QualificationService, whatsappService: WhatsAppService, followupGen: FollowupGenerationService, config: ConfigService, followupQueue: Queue, jobsService: JobsService, llmProvider: LlmProvider);
     handleVapiWebhook(payload: VapiWebhookEvent): Promise<WebhookProcessResult>;
     private processEvent;
     private handleStatusUpdate;

@@ -75,7 +75,6 @@ Return ONLY valid JSON.
             if (!finalMessage.includes(this.developerMobile)) {
                 finalMessage += `\n\nContact: ${this.developerName} — ${this.developerMobile}`;
             }
-            console.log('Generated follow-up message:', finalMessage);
             return finalMessage;
         }
         catch (err) {

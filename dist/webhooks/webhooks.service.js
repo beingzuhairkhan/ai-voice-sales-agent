@@ -30,8 +30,10 @@ const config_1 = require("@nestjs/config");
 const bullmq_1 = require("@nestjs/bullmq");
 const bullmq_2 = require("bullmq");
 const jobs_service_1 = require("../jobs/jobs.service");
+const llm_provider_interface_1 = require("../ai/llm-provider.interface");
+const summarize_prompt_1 = require("../ai/prompts/summarize.prompt");
 let WebhooksService = WebhooksService_1 = class WebhooksService {
-    constructor(webhookEventModel, actionEventModel, callsService, conversationsService, leadsService, extractionService, qualificationService, whatsappService, followupGen, config, followupQueue) {
+    constructor(webhookEventModel, actionEventModel, callsService, conversationsService, leadsService, extractionService, qualificationService, whatsappService, followupGen, config, followupQueue, jobsService, llmProvider) {
         this.webhookEventModel = webhookEventModel;
         this.actionEventModel = actionEventModel;
         this.callsService = callsService;
@@ -43,6 +45,8 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
         this.followupGen = followupGen;
         this.config = config;
         this.followupQueue = followupQueue;
+        this.jobsService = jobsService;
+        this.llmProvider = llmProvider;
         this.logger = new common_1.Logger(WebhooksService_1.name);
     }
     async handleVapiWebhook(payload) {
@@ -188,7 +192,7 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
         const duration = payload.message?.artifact?.durationSeconds;
         const transcript = payload.message?.artifact?.transcript;
         const recordingUrl = payload.message?.artifact?.recordingUrl;
-        const summary = payload.message?.artifact?.summary || '';
+        const summary = await this.llmProvider.summarize(transcript || '', summarize_prompt_1.SUMMARIZE_PROMPT);
         if (transcript) {
             await this.callsService.saveTranscript(callId, transcript);
         }
@@ -214,14 +218,11 @@ let WebhooksService = WebhooksService_1 = class WebhooksService {
                 success: true,
             });
             await this.callsService.updateCallStatus(callId, 'ended', { leadId: lead._id });
-            const job = await this.followupQueue.add('POST_CALL_FOLLOWUP', {
+            await this.jobsService
+                .enqueuePostCallFollowup(callId);
+            this.logger.log({
                 callId,
-            }, {
-                jobId: `post-call-followup-${callId}`,
-                removeOnComplete: true,
-                removeOnFail: false,
-            });
-            console.log("JOB", job.id);
+            }, ' POST-CALL FOLLOWUP ENQUEUED');
         }
         catch (err) {
             this.logger.error({ err: err.message, callId }, 'Post-call extraction/classification failed');
@@ -291,6 +292,7 @@ exports.WebhooksService = WebhooksService = WebhooksService_1 = __decorate([
     __param(0, (0, mongoose_1.InjectModel)(webhook_event_schema_1.WebhookEvent.name)),
     __param(1, (0, mongoose_1.InjectModel)(action_event_schema_1.ActionEvent.name)),
     __param(10, (0, bullmq_1.InjectQueue)(jobs_service_1.FOLLOWUP_QUEUE)),
+    __param(12, (0, common_1.Inject)(llm_provider_interface_1.LLM_PROVIDER)),
     __metadata("design:paramtypes", [mongoose_2.Model,
         mongoose_2.Model,
         calls_service_1.CallsService,
@@ -301,6 +303,7 @@ exports.WebhooksService = WebhooksService = WebhooksService_1 = __decorate([
         whatsapp_service_1.WhatsAppService,
         followup_generation_service_1.FollowupService,
         config_1.ConfigService,
-        bullmq_2.Queue])
+        bullmq_2.Queue,
+        jobs_service_1.JobsService, Object])
 ], WebhooksService);
 //# sourceMappingURL=webhooks.service.js.map

@@ -40,7 +40,7 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
                     budget: parsed.budget || "to be discussed",
                     timeline: parsed.timeline || "to be discussed",
                     requiredFeatures: parsed.requiredFeatures || "the required features",
-                    developerMobile: parsed.developerMobile || this.developerMobile || "+910000000000",
+                    developerMobile: parsed.developerMobile || this.developerMobile || "+919967705134",
                     resumeUrl: parsed.resumeUrl || this.resumeUrl || "https://example.com",
                     systemOverviewUrl: parsed.systemOverviewUrl || this.systemOverviewUrl || "https://example.com",
                 };
@@ -54,14 +54,13 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
             budget: "to be discussed",
             timeline: "to be discussed",
             requiredFeatures: "the required features",
-            developerMobile: this.developerMobile || "+910000000000",
+            developerMobile: this.developerMobile || "+919967705134",
             resumeUrl: this.resumeUrl || "https://example.com",
             systemOverviewUrl: this.systemOverviewUrl || "https://example.com",
         };
     }
     async sendTextMessage(to, body) {
         return this.retryUtil.withRetry(async () => {
-            console.log("Sending WhatsApp message to:", body);
             const params = this.extractTemplateParams(body);
             const response = await fetch(`${this.apiUrl}/${this.phoneNumberId}/messages`, {
                 method: 'POST',
@@ -126,6 +125,7 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
     }
     async sendHotMidCall(to, summary) {
         console.log("Sending WhatsApp hot mid-call message to:", to, "with summary:", summary);
+        const sanitizedSummary = summary.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
         return this.retryUtil.withRetry(async () => {
             const response = await fetch(`${this.apiUrl}/${this.phoneNumberId}/messages`, {
                 method: 'POST',
@@ -146,7 +146,7 @@ let WhatsAppMetaProvider = WhatsAppMetaProvider_1 = class WhatsAppMetaProvider {
                                 parameters: [
                                     {
                                         type: 'text',
-                                        text: summary,
+                                        text: sanitizedSummary,
                                     },
                                 ],
                             },

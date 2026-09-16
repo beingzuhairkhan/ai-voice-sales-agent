@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WebhookEvent } from './webhook-event.schema';
@@ -14,7 +14,9 @@ import { ConfigService } from '@nestjs/config';
 import { VapiWebhookEvent } from '../vapi/vapi-provider.interface';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { FOLLOWUP_QUEUE } from '@/jobs/jobs.service';
+import { FOLLOWUP_QUEUE, JobsService } from '@/jobs/jobs.service';
+import { LLM_PROVIDER, LlmProvider } from '@/ai/llm-provider.interface';
+import { SUMMARIZE_PROMPT } from '@/ai/prompts/summarize.prompt';
 
 export interface WebhookProcessResult {
   status: 'processed' | 'duplicate' | 'ignored' | 'failed';
@@ -38,7 +40,10 @@ export class WebhooksService {
     private followupGen: FollowupGenerationService,
     private config: ConfigService,
     @InjectQueue(FOLLOWUP_QUEUE)
-  private readonly followupQueue: Queue,
+    private readonly followupQueue: Queue,
+    private jobsService: JobsService,
+    @Inject(LLM_PROVIDER)
+    private llmProvider: LlmProvider,
   ) { }
 
   async handleVapiWebhook(payload: VapiWebhookEvent): Promise<WebhookProcessResult> {
@@ -237,10 +242,15 @@ export class WebhooksService {
     const call = payload.message?.call;
     if (!callId) return { status: 'ignored', message: 'No internal call for end-of-call' };
 
-    const duration = payload.message?.artifact?.durationSeconds 
-    const transcript = payload.message?.artifact?.transcript 
+    const duration = payload.message?.artifact?.durationSeconds
+    const transcript = payload.message?.artifact?.transcript
     const recordingUrl = payload.message?.artifact?.recordingUrl
-    const summary = payload.message?.artifact?.summary || '' ;
+    // const summary = payload.message?.artifact?.summary || '';
+
+      const summary = await this.llmProvider.summarize(
+      transcript || '',SUMMARIZE_PROMPT
+    )
+
 
     // Save transcript and end the call
     if (transcript) {
@@ -300,18 +310,15 @@ export class WebhooksService {
       //   }
       // }
 
-        const job =  await this.followupQueue.add(
-      'POST_CALL_FOLLOWUP',
-      {
-        callId,
-      },
-      {
-        jobId: `post-call-followup-${callId}`,
-        removeOnComplete: true,
-        removeOnFail: false,
-      },
-    );
-    console.log("JOB" , job.id)
+      await this.jobsService
+        .enqueuePostCallFollowup(callId);
+
+      this.logger.log(
+        {
+          callId,
+        },
+        ' POST-CALL FOLLOWUP ENQUEUED',
+      );
     } catch (err) {
       this.logger.error({ err: (err as Error).message, callId }, 'Post-call extraction/classification failed');
     }

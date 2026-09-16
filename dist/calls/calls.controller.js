@@ -21,6 +21,11 @@ let CallsController = class CallsController {
     constructor(callsService) {
         this.callsService = callsService;
     }
+    async getAllActions(page = '1', limit = '10', search, status) {
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+        return this.callsService.getAllActions(pageNum, limitNum, search, status);
+    }
     async startCall(dto) {
         const assistandId = process.env.VAPI_ASSISTANT_ID;
         if (!assistandId) {
@@ -48,8 +53,19 @@ let CallsController = class CallsController {
 };
 exports.CallsController = CallsController;
 __decorate([
+    (0, common_1.Get)('actions'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all action events with pagination, search, and status filter' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('search')),
+    __param(3, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:returntype", Promise)
+], CallsController.prototype, "getAllActions", null);
+__decorate([
     (0, common_1.Post)('start'),
-    (0, swagger_1.ApiOperation)({ summary: 'Start an outbound call (defaults to +918688664337)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Start an outbound call (defaults to +919967705134)' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [call_dto_1.StartCallDto]),

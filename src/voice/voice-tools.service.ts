@@ -89,7 +89,15 @@ export class VoiceToolsService {
     dto: any,
   ): Promise<{ success: boolean; message: string; messageId?: string }> {
     try {
+      console.log("sendWhatsapp called with dto:", dto);
       const call = await this.validateActiveCall(dto.callId);
+      const messageContent = dto.messageContent ?? dto.msg;
+
+    if (!messageContent) {
+      throw new BadRequestException(
+        'WhatsApp message content is required',
+      );
+    }
 
       if (!call) {
         throw new BadRequestException(
@@ -123,17 +131,17 @@ export class VoiceToolsService {
         data: {
           trigger: 'VOICE_TOOL',
           whatsappType: 'HOT_MID_CALL',
-          messageLength: dto.messageContent.length,
+          messageLength: messageContent.length
         },
         success: true,
       });
 
       try {
-        // Send HOT_MID_CALL template
+
         const whatsappMsg =
           await this.whatsappService.sendTextMessage(
             call.phoneNumber,
-            dto.messageContent,
+            messageContent,
             {
               leadId: lead._id,
               triggerAction: 'HOT_MID_CALL',
@@ -382,7 +390,6 @@ export class VoiceToolsService {
       })
       .exec();
 
-    console.log("voice service validateActiveCall", call)
     if (!call) throw new NotFoundException(`Call ${callId} not found`);
     if (call.status === 'ended' || call.status === 'failed' || call.status === 'cancelled') {
       throw new BadRequestException(`Call ${callId} is not active (status: ${call.status})`);
