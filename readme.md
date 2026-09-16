@@ -178,9 +178,3 @@ npm run dev
 ![Activity](screenshots/activity.png)
 
 ---
-
-<div align="center">
-
-**Built for ElevateScale Technologies Private Limited · ElevateBox · Banjara Hills, Hyderabad**
-
-</div>
